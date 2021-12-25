@@ -33,6 +33,7 @@ func CreateStreamer(port int, queue chan []byte) *Streamer {
 }
 
 func (s *Streamer) connect() {
+	log.V5(fmt.Sprintf("openinig socket to %v:%v", core.Config.StreamHost, s.port))
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
 		IP:   net.ParseIP(core.Config.StreamHost),
 		Port: s.port,
