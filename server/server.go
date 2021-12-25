@@ -17,7 +17,7 @@ import (
 	"www.seawise.com/client/log"
 )
 
-var home = os.Getenv("HOME") + "/seawise-video-stream/client/"
+var home = os.Getenv("HOME") + "/seawise-video-streamer/"
 var deviceInfoFile = home + "core/saved/deviceInfo.conf"
 var deviceConfigFile = home + "core/saved/deviceConfig.conf"
 
