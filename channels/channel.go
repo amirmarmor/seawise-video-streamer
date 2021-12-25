@@ -42,10 +42,10 @@ func (c *Channel) Init() error {
 		return fmt.Errorf("Init failed to capture video %v: ", err)
 	}
 
-	c.capture.Set(gocv.VideoCaptureFPS, float64(10))
-	c.capture.Set(gocv.VideoCaptureFrameWidth, 320)
-	c.capture.Set(gocv.VideoCaptureFrameHeight, 160)
-	c.capture.Set(gocv.VideoCaptureBufferSize, 10)
+	vc.Set(gocv.VideoCaptureFPS, float64(10))
+	vc.Set(gocv.VideoCaptureFrameWidth, 320)
+	vc.Set(gocv.VideoCaptureFrameHeight, 160)
+	vc.Set(gocv.VideoCaptureBufferSize, 10)
 	img := gocv.NewMat()
 
 	ok := vc.Read(&img)
