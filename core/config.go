@@ -17,10 +17,10 @@ type Configuration = struct {
 var Config Configuration
 
 func InitFlags() {
-	flag.StringVar(&Config.BackendHost, "backend-host", "localhost", "The backend host")
-	flag.StringVar(&Config.BackendPort, "backend-port", "5000", "The backend port")
-	flag.StringVar(&Config.StreamHost, "stream-host", "localhost", "The stream host")
-	flag.IntVar(&Config.StreamPort, "stream-port", 8000, "The stream port")
+	flag.StringVar(&Config.BackendHost, "behost", "localhost", "The backend host")
+	flag.StringVar(&Config.BackendPort, "beport", "5000", "The backend port")
+	flag.StringVar(&Config.StreamHost, "sthost", "localhost", "The stream host")
+	flag.IntVar(&Config.StreamPort, "stport", 8000, "The stream port")
 	flag.StringVar(&Config.Port, "port", ":3000", "port")
 
 	log.AddNotify(postParse)
