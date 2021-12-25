@@ -119,6 +119,7 @@ func (c *Channel) Read() {
 	}
 
 	c.Queue <- c.encodeImage()
+	time.Sleep(10)
 }
 
 func (c *Channel) encodeImage() []byte {
