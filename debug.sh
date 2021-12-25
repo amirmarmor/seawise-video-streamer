@@ -6,8 +6,8 @@ sudo rmmod uvcvideo
 sudo modprobe uvcvideo nodrop=1 timeout=1000 quirks=0x80
 
 export VERBOSE=5
-export APIHOST="192.168.1.16"
-echo $APIHOST
+export BEHOST="192.168.1.16"
+echo $BEHOST
 cmd=./start
 $cmd
 

@@ -6,8 +6,8 @@ sudo rmmod uvcvideo
 sudo modprobe uvcvideo nodrop=1 timeout=1000 quirks=0x80
 
 export VERBOSE=0
-export APIHOST="seawisely.com"
-echo $APIHOST
+export BEHOST="seawisely.com"
+echo $BEHOST
 cmd=./start
 $cmd &
 
