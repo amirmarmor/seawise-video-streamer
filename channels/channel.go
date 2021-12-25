@@ -111,6 +111,9 @@ func (c *Channel) getImage() error {
 
 func (c *Channel) Read() {
 	c.capture.Set(gocv.VideoCaptureFPS, float64(c.fps))
+	c.capture.Set(gocv.VideoCaptureFrameWidth, 320)
+	c.capture.Set(gocv.VideoCaptureFrameHeight, 160)
+	c.capture.Set(gocv.VideoCaptureBufferSize, 10)
 
 	err := c.getImage()
 	if err != nil {
