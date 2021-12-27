@@ -65,6 +65,7 @@ func (c *Channel) close() {
 	if err != nil {
 		log.Warn(fmt.Sprintf("failed to close image: %v", err))
 	}
+
 	c.init = false
 	log.V5("stopped....")
 }

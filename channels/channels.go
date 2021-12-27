@@ -73,6 +73,7 @@ func (c *Channels) DetectCameras() error {
 				continue
 			} else {
 				c.Array = append(c.Array, channel)
+				channel.close()
 			}
 		}
 
