@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"net"
 	"time"
+	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
 
@@ -35,7 +36,7 @@ func CreateStreamer(port int) *Streamer {
 func (s *Streamer) connect() {
 	log.V5(fmt.Sprintf("opening socket on port: %v", s.port))
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-		IP:   net.ParseIP("0.0.0.0"),
+		IP:   net.ParseIP(core.Config.BackendHost),
 		Port: s.port,
 	})
 
