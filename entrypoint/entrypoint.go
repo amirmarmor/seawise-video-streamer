@@ -46,8 +46,5 @@ func (p *EntryPoint) buildBlocks() {
 		panic(err)
 	}
 
-	p.server, err = server.Produce(p.channels)
-	if err != nil {
-		panic(err)
-	}
+	p.server = server.Produce(p.channels)
 }

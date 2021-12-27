@@ -6,7 +6,6 @@ import (
 	"gocv.io/x/gocv"
 	"image/jpeg"
 	"time"
-	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
 
@@ -16,9 +15,8 @@ type Channel struct {
 	init        bool
 	capture     *gocv.VideoCapture
 	image       gocv.Mat
-	Queue       chan []byte
 	StopChannel chan string
-	streamer    *Streamer
+	queue       *chan []byte
 }
 
 type Recording struct {
@@ -29,7 +27,6 @@ type Recording struct {
 func CreateChannel(channelName int) *Channel {
 	channel := &Channel{
 		name:        channelName,
-		Queue:       make(chan []byte),
 		StopChannel: make(chan string),
 	}
 
@@ -53,23 +50,10 @@ func (c *Channel) Init() error {
 		return fmt.Errorf("Init failed to read")
 	}
 
-	c.init = true
-
 	c.capture = vc
 	c.image = img
 
 	return nil
-}
-
-func (c *Channel) Ready(fps int, id int, count int) {
-	port := core.Config.StreamPort + (id * 10) + count
-	c.fps = fps
-
-	if c.streamer == nil {
-		c.streamer = CreateStreamer(port, c.Queue)
-	}
-
-	c.init = true
 }
 
 func (c *Channel) close() {
@@ -86,7 +70,11 @@ func (c *Channel) close() {
 	log.V5("stopped....")
 }
 
-func (c *Channel) Start() {
+func (c *Channel) Start(q *chan []byte) {
+	if c.queue == nil {
+		c.queue = q
+	}
+	c.init = true
 	for c.init {
 		select {
 		case <-c.StopChannel:
@@ -111,15 +99,13 @@ func (c *Channel) getImage() error {
 }
 
 func (c *Channel) Read() {
-
 	err := c.getImage()
 	if err != nil {
 		log.Warn(fmt.Sprintf("failed to read image: %v", err))
 		return
 	}
 
-	c.Queue <- c.encodeImage()
-	time.Sleep(10)
+	*c.queue <- c.encodeImage()
 }
 
 func (c *Channel) encodeImage() []byte {

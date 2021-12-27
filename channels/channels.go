@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"www.seawise.com/client/log"
 )
 
@@ -13,12 +14,16 @@ type Channels struct {
 	counter  int
 	Array    []*Channel
 	attempts int
-	Started  []bool
+	Started  bool
+	Active   int
+	ticker   *time.Ticker
 }
 
 func Create(attempts int) (*Channels, error) {
 	chs := &Channels{
 		attempts: attempts,
+		ticker:   time.NewTicker(10 * time.Second),
+		Active:   0,
 	}
 
 	err := chs.DetectCameras()
@@ -68,7 +73,6 @@ func (c *Channels) DetectCameras() error {
 				continue
 			} else {
 				c.Array = append(c.Array, channel)
-				c.Started = append(c.Started, false)
 			}
 		}
 
@@ -82,19 +86,34 @@ func (c *Channels) DetectCameras() error {
 	return nil
 }
 
-func (c *Channels) Start(fps int, num int, id int) {
-	if !c.Started[num] {
-		c.Array[num].Ready(fps, id, num)
-		go c.Array[num].Start()
-		log.V5(fmt.Sprintf("Started channel - %v", num))
-		c.Started[num] = true
+func (c *Channels) Start(q *chan []byte) {
+	if !c.Started {
+		go c.Array[c.Active].Start(q)
+		c.Started = true
+	}
+	for {
+		select {
+		case <-c.ticker.C:
+			c.Switch(q)
+		}
 	}
 }
 
-func (c *Channels) Stop(num int) {
-	if c.Started[num] {
-		c.Array[num].StopChannel <- "stop"
-		c.Started[num] = false
-		log.V5(fmt.Sprintf("Stopped channel - %v", num))
+func (c *Channels) Switch(q *chan []byte) {
+	log.V5(fmt.Sprintf("Stopping Channel %v", c.Active))
+	c.Array[c.Active].StopChannel <- "stop"
+	c.Active += 1
+	if c.Active >= len(c.Array) {
+		c.Active = 0
 	}
+	go c.Array[c.Active].Start(q)
+	log.V5(fmt.Sprintf("Starting Channel %v", c.Active))
 }
+
+//func (c *Channels) Stop(num int) {
+//	if c.Started[num] {
+//		c.Array[num].StopChannel <- "stop"
+//		c.Started[num] = false
+//		log.V5(fmt.Sprintf("Stopped channel - %v", num))
+//	}
+//}

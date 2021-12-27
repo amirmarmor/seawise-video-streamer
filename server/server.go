@@ -8,52 +8,35 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 	"www.seawise.com/client/channels"
 	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
 
-var home = os.Getenv("HOME") + "/seawise-video-streamer/"
-var deviceInfoFile = home + "core/saved/deviceInfo.conf"
-var deviceConfigFile = home + "core/saved/deviceConfig.conf"
-
 type DeviceInfo struct {
 	Sn       string `json:"sn"`
 	Owner    string `json:"owner"`
-	Id       int    `json:"id"`
 	Ip       string `json:"ip"`
 	Channels int    `json:"channels"`
-}
-
-type RegisterResponse struct {
-	RegistrationId int `json:"id"`
-}
-
-type MessageResponse struct {
-	Msg string `json:"msg"`
-}
-
-type Configuration struct {
-	Id      int  `json:"id"`
-	Offset  int  `json:"offset"`
-	Cleanup bool `json:"cleanup"`
-	Fps     int  `json:"fps"`
+	Fps      int    `json:"fps"`
+	Port     int    `json:"port"`
 }
 
 type Server struct {
-	Backend       string
-	DeviceInfo    *DeviceInfo
-	Configuration *Configuration
-	Router        *mux.Router
-	Channels      *channels.Channels
-	Platform      string
+	Backend    string
+	DeviceInfo *DeviceInfo
+	Router     *mux.Router
+	Channels   *channels.Channels
+	Streamer   *Streamer
+	Platform   string
 }
 
-func Produce(channels *channels.Channels) (*Server, error) {
+func Produce(channels *channels.Channels) *Server {
+	attempt := 0
 	backend := fmt.Sprintf("http://%v:%v", core.Config.BackendHost, core.Config.BackendPort)
 
 	server := &Server{
@@ -63,69 +46,37 @@ func Produce(channels *channels.Channels) (*Server, error) {
 
 	log.V5("REGISTERING DEVICE - " + server.Backend)
 
-	err := server.Register(len(channels.Array))
-	if err != nil {
-		return nil, err
+	for attempt < 5 {
+		err := server.Register(len(channels.Array))
+		if err != nil {
+			log.Warn(fmt.Sprintf("failed to register: %v", err))
+			log.Warn(fmt.Sprintf("Retrying to register - attempt %v", strconv.Itoa(attempt)))
+			attempt++
+			time.Sleep(3 * time.Second)
+		} else {
+			attempt = 5
+		}
 	}
 
-	err = server.GetConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get configuration: %v", err)
+	for server.Streamer == nil {
+		server.Streamer = CreateStreamer(server.DeviceInfo.Port)
 	}
 
 	server.Router = mux.NewRouter()
-	server.Router.HandleFunc("/start/{num}", server.StartHandler)
-	server.Router.HandleFunc("/stop/{num}", server.StopHandler)
+	server.Router.HandleFunc("/start", server.StartHandler)
+	//server.Router.HandleFunc("/stop/{num}", server.StopHandler)
 	server.Router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
 		if err != nil {
 			log.Warn(fmt.Sprintf("unable to write response on health check: %v", err))
 		}
 	})
-	return server, nil
-}
 
-func (s *Server) GetConfig() error {
-	s.Configuration = &Configuration{
-		Offset: 0,
-		Id:     s.DeviceInfo.Id,
-	}
-
-	var body []byte
-
-	resp, err := http.Get(s.Backend + "/api/device/" + strconv.Itoa(s.DeviceInfo.Id))
-
-	if err != nil || resp.StatusCode != 200 {
-		log.Warn(fmt.Sprintf("failed to get Configuration from remote using local: %v", err))
-
-		body, err = ioutil.ReadFile(deviceConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to read saved config EXITING: %v", err)
-		}
-	} else {
-		body, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("Invalid response from server EXITING: %v", err)
-		}
-
-		err = ioutil.WriteFile(deviceConfigFile, body, 0644)
-		if err != nil {
-			return fmt.Errorf("Failed to write config to local EXITING: %v", err)
-		}
-
-		defer resp.Body.Close()
-	}
-
-	err = json.Unmarshal(body, s.Configuration)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal: %v", err)
-	}
-
-	return nil
+	return server
 }
 
 func (s *Server) Register(channels int) error {
-	url := s.Backend + "/api/register"
+	url := s.Backend + "/register"
 	err := s.getPlatform()
 	if err != nil {
 		return fmt.Errorf("failed to register: %v", err)
@@ -157,25 +108,13 @@ func (s *Server) Register(channels int) error {
 	var body []byte
 	body, err = s.post(url, postBody)
 	if err != nil {
-		log.Warn(fmt.Sprintf("failed to register device no connectivity, looking to saved info: %v", err))
-		body, err = ioutil.ReadFile(deviceInfoFile)
-		if err != nil {
-			return fmt.Errorf("failed to read info file and no connectivity: %v", err)
-		}
-	} else {
-		err := os.WriteFile(deviceInfoFile, body, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to write info EXITING: %v", err)
-		}
+		return fmt.Errorf("failed to register device no connectivity: %v", err)
 	}
 
-	response := &RegisterResponse{}
-	err = json.Unmarshal(body, response)
+	err = json.Unmarshal(body, s.DeviceInfo)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal register response: %v", err)
 	}
-
-	s.DeviceInfo.Id = response.RegistrationId
 
 	return nil
 }
@@ -188,6 +127,7 @@ func (s *Server) post(url string, postBody []byte) ([]byte, error) {
 	}
 
 	defer resp.Body.Close()
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to post: %v", err)
@@ -245,35 +185,29 @@ func (s *Server) getIp() (string, error) {
 }
 
 func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	cam, err := strconv.Atoi(vars["num"])
 	var response string
-	if err != nil || cam > s.DeviceInfo.Channels {
-		response = fmt.Sprintf("Invalid camera number - %v", cam)
-		log.Warn(response)
-	} else {
-		go s.Channels.Start(s.Configuration.Fps, cam, s.Configuration.Id)
-		response = "starting..."
-	}
-	_, err = w.Write([]byte(response))
+	go s.Channels.Start(s.Streamer.Queue)
+	response = "starting..."
+
+	_, err := w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}
 }
 
-func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	cam, err := strconv.Atoi(vars["num"])
-	var response string
-	if err != nil || cam > s.DeviceInfo.Channels {
-		response = fmt.Sprintf("Invalid camera number - %v", cam)
-		log.Warn(response)
-	} else {
-		go s.Channels.Stop(cam)
-		response = "stopping..."
-	}
-	_, err = w.Write([]byte(response))
-	if err != nil {
-		panic(err)
-	}
-}
+//func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
+//	vars := mux.Vars(r)
+//	cam, err := strconv.Atoi(vars["num"])
+//	var response string
+//	if err != nil || cam > s.DeviceInfo.Channels {
+//		response = fmt.Sprintf("Invalid camera number - %v", cam)
+//		log.Warn(response)
+//	} else {
+//		go s.Channels.Stop(cam)
+//		response = "stopping..."
+//	}
+//	_, err = w.Write([]byte(response))
+//	if err != nil {
+//		panic(err)
+//	}
+//}

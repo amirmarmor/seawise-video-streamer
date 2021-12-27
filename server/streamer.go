@@ -1,4 +1,4 @@
-package channels
+package server
 
 import (
 	"bufio"
@@ -7,22 +7,22 @@ import (
 	"github.com/gorilla/mux"
 	"net"
 	"time"
-	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
 
 type Streamer struct {
 	TCPConn                 *net.TCPConn
 	port                    int
-	queue                   chan []byte
 	timeStampPacketSize     uint
 	contentLengthPacketSize uint
 	Router                  *mux.Router
+	Queue                   *chan []byte
 }
 
-func CreateStreamer(port int, queue chan []byte) *Streamer {
+func CreateStreamer(port int) *Streamer {
+	q := make(chan []byte)
 	streamer := &Streamer{
-		queue:                   queue,
+		Queue:                   &q,
 		port:                    port,
 		timeStampPacketSize:     8,
 		contentLengthPacketSize: 8,
@@ -33,9 +33,9 @@ func CreateStreamer(port int, queue chan []byte) *Streamer {
 }
 
 func (s *Streamer) connect() {
-	log.V5(fmt.Sprintf("openinig socket to %v:%v", core.Config.StreamHost, s.port))
+	log.V5(fmt.Sprintf("opening socket on port: %v", s.port))
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-		IP:   net.ParseIP(core.Config.StreamHost),
+		IP:   net.ParseIP("0.0.0.0"),
 		Port: s.port,
 	})
 
@@ -53,7 +53,7 @@ func (s *Streamer) connect() {
 
 func (s *Streamer) handleSend() {
 	writer := bufio.NewWriter(s.TCPConn)
-	for pkt := range s.queue {
+	for pkt := range *s.Queue {
 		_, err := writer.Write(s.pack(pkt))
 		if err != nil {
 			log.Warn(fmt.Sprintf("Packet Send Failed! - %v", err))
