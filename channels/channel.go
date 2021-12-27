@@ -40,8 +40,8 @@ func (c *Channel) Init() error {
 	}
 
 	vc.Set(gocv.VideoCaptureFPS, float64(30))
-	vc.Set(gocv.VideoCaptureFrameWidth, 1920)
-	vc.Set(gocv.VideoCaptureFrameHeight, 1080)
+	vc.Set(gocv.VideoCaptureFrameWidth, 1024)
+	vc.Set(gocv.VideoCaptureFrameHeight, 720)
 	vc.Set(gocv.VideoCaptureBufferSize, 1)
 	img := gocv.NewMat()
 
@@ -52,20 +52,19 @@ func (c *Channel) Init() error {
 
 	c.capture = vc
 	c.image = img
-
+	c.init = true
 	return nil
 }
 
 func (c *Channel) close() {
-	//err := c.capture.Close()
-	//if err != nil {
-	//	log.Warn(fmt.Sprintf("failed to close capture: %v", err))
-	//}
-	//err = c.image.Close()
-	//if err != nil {
-	//	log.Warn(fmt.Sprintf("failed to close image: %v", err))
-	//}
-	//
+	err := c.capture.Close()
+	if err != nil {
+		log.Warn(fmt.Sprintf("failed to close capture: %v", err))
+	}
+	err = c.image.Close()
+	if err != nil {
+		log.Warn(fmt.Sprintf("failed to close image: %v", err))
+	}
 	c.init = false
 	log.V5("stopped....")
 }
@@ -74,7 +73,13 @@ func (c *Channel) Start(q *chan []byte) {
 	if c.queue == nil {
 		c.queue = q
 	}
-	c.init = true
+
+	err := c.Init()
+	if err != nil {
+		log.Warn(fmt.Sprintf("failed to inititate channel: %v", err))
+		return
+	}
+
 	for c.init {
 		select {
 		case <-c.StopChannel:
