@@ -6,7 +6,7 @@ import (
 	"www.seawise.com/client/log"
 )
 
-const DefaultLoop = 2
+const DefaultLoop = 60
 
 type Configuration = struct {
 	Port        string
