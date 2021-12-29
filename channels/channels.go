@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
 
@@ -87,11 +88,19 @@ func (c *Channels) DetectCameras() error {
 	return nil
 }
 
-func (c *Channels) Start(q *chan []byte) {
+func (c *Channels) Start(q *chan []byte, loop int) {
 	if !c.Started {
 		go c.Array[c.Active].Start(q)
 		c.Started = true
 	}
+
+	if loop == 0 {
+		loop = core.DefaultLoop
+	}
+
+	c.ticker = time.NewTicker(time.Duration(loop) * time.Second)
+
+	log.V5(fmt.Sprintf("Starting with loop interval of %v", loop))
 	for {
 		select {
 		case <-c.ticker.C:
@@ -101,6 +110,9 @@ func (c *Channels) Start(q *chan []byte) {
 }
 
 func (c *Channels) Switch(q *chan []byte) {
+	if len(c.Array) <= 1 {
+		return
+	}
 	log.V5(fmt.Sprintf("Stopping Channel %v", c.Active))
 	c.Array[c.Active].StopChannel <- "stop"
 	c.Active += 1

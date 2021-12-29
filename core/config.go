@@ -6,6 +6,8 @@ import (
 	"www.seawise.com/client/log"
 )
 
+const DefaultLoop = 2
+
 type Configuration = struct {
 	Port        string
 	BackendHost string
@@ -17,7 +19,7 @@ var Config Configuration
 func InitFlags() {
 	flag.StringVar(&Config.BackendHost, "behost", "localhost", "The backend host")
 	flag.StringVar(&Config.BackendPort, "beport", "8080", "The backend port")
-	flag.StringVar(&Config.Port, "port", ":3000", "port")
+	flag.StringVar(&Config.Port, "port", ":4000", "port")
 
 	log.AddNotify(postParse)
 }

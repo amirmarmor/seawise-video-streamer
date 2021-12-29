@@ -22,7 +22,7 @@ type DeviceInfo struct {
 	Owner    string `json:"owner"`
 	Ip       string `json:"ip"`
 	Channels int    `json:"channels"`
-	Fps      int    `json:"fps"`
+	Loop     int    `json:"loop"`
 	Port     int    `json:"port"`
 }
 
@@ -186,7 +186,7 @@ func (s *Server) getIp() (string, error) {
 
 func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	var response string
-	go s.Channels.Start(s.Streamer.Queue)
+	go s.Channels.Start(s.Streamer.Queue, s.DeviceInfo.Loop)
 	response = "starting..."
 
 	_, err := w.Write([]byte(response))
