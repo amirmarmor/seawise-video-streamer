@@ -34,15 +34,15 @@ func CreateChannel(channelName int) *Channel {
 }
 
 func (c *Channel) Init() error {
-	vc, err := gocv.OpenVideoCapture(c.name)
+	vc, err := gocv.OpenVideoCaptureWithAPI(c.name, gocv.VideoCaptureOpencvMjpeg)
 	if err != nil {
 		return fmt.Errorf("Init failed to capture video %v: ", err)
 	}
 
-	vc.Set(gocv.VideoCaptureFPS, float64(30))
 	vc.Set(gocv.VideoCaptureFrameWidth, 1024)
 	vc.Set(gocv.VideoCaptureFrameHeight, 720)
 	vc.Set(gocv.VideoCaptureBufferSize, 1)
+
 	img := gocv.NewMat()
 
 	ok := vc.Read(&img)
