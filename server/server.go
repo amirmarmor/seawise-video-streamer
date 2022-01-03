@@ -232,7 +232,9 @@ func (s *Server) RestartHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	cmd := exec.Command("echo", "reboot")
+
+	log.V5("AAAAAAAA")
+	cmd := exec.Command("sudo", "reboot")
 	_, err = cmd.Output()
 	if err != nil {
 		log.Warn("Failed to reboot")
