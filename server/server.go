@@ -63,6 +63,7 @@ func Produce(channels *channels.Channels) *Server {
 	}
 
 	server.Router = mux.NewRouter()
+	server.Router.HandleFunc("/restart", server.RestartHandler)
 	server.Router.HandleFunc("/start/{ch}", server.StartHandler)
 	server.Router.HandleFunc("/stop/{num}", server.StopHandler)
 	server.Router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
@@ -208,14 +209,6 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func sendErrorMessage(w http.ResponseWriter) {
-	w.WriteHeader(500)
-	_, err := w.Write([]byte("an error occured"))
-	if err != nil {
-		log.Warn("failed to write response")
-	}
-}
-
 func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
 	var response string
 	vars := mux.Vars(r)
@@ -230,5 +223,27 @@ func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write([]byte(response))
 	if err != nil {
 		panic(err)
+	}
+}
+
+func (s *Server) RestartHandler(w http.ResponseWriter, r *http.Request) {
+	response := "Rebooting..."
+	_, err := w.Write([]byte(response))
+	if err != nil {
+		panic(err)
+	}
+	cmd := exec.Command("echo", "reboot")
+	_, err = cmd.Output()
+	if err != nil {
+		log.Warn("Failed to reboot")
+		return
+	}
+}
+
+func sendErrorMessage(w http.ResponseWriter) {
+	w.WriteHeader(500)
+	_, err := w.Write([]byte("an error occured"))
+	if err != nil {
+		log.Warn("failed to write response")
 	}
 }
