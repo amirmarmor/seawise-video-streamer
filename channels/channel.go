@@ -10,13 +10,15 @@ import (
 )
 
 type Channel struct {
+	started     bool
 	fps         int
 	name        int
 	init        bool
 	capture     *gocv.VideoCapture
 	image       gocv.Mat
 	StopChannel chan string
-	queue       *chan []byte
+	Queue       *chan []byte
+	ticker      *time.Ticker
 }
 
 type Recording struct {
@@ -25,9 +27,11 @@ type Recording struct {
 }
 
 func CreateChannel(channelName int) *Channel {
+	q := make(chan []byte)
 	channel := &Channel{
 		name:        channelName,
 		StopChannel: make(chan string),
+		Queue:       &q,
 	}
 
 	return channel
@@ -38,12 +42,15 @@ func (c *Channel) Init() error {
 	if err != nil {
 		return fmt.Errorf("Init failed to capture video %v: ", err)
 	}
+	//defer vc.Close()
 
-	vc.Set(gocv.VideoCaptureFPS, float64(15))
-	vc.Set(gocv.VideoCaptureFrameWidth, 320)
-	vc.Set(gocv.VideoCaptureFrameHeight, 160)
+	//vc.Set(gocv.VideoCaptureFPS, 10)
+	vc.Set(gocv.VideoCaptureFrameWidth, 1920)
+	vc.Set(gocv.VideoCaptureFrameHeight, 1024)
 	vc.Set(gocv.VideoCaptureBufferSize, 1)
+
 	img := gocv.NewMat()
+	//defer img.Close()
 
 	ok := vc.Read(&img)
 	if !ok {
@@ -56,39 +63,36 @@ func (c *Channel) Init() error {
 	return nil
 }
 
-func (c *Channel) close() {
-	err := c.capture.Close()
-	if err != nil {
-		log.Warn(fmt.Sprintf("failed to close capture: %v", err))
-	}
-	err = c.image.Close()
-	if err != nil {
-		log.Warn(fmt.Sprintf("failed to close image: %v", err))
-	}
-
-	c.init = false
+func (c *Channel) stop() {
+	c.ticker.Stop()
+	c.started = false
 	log.V5("stopped....")
 }
 
-func (c *Channel) Start(q *chan []byte) {
-	if c.queue == nil {
-		c.queue = q
-	}
+func (c *Channel) Start() {
+	if !c.started {
+		c.started = true
 
-	err := c.Init()
+		c.ticker = time.NewTicker(100 * time.Millisecond)
+		for c.init {
+			select {
+			case <-c.StopChannel:
+				c.stop()
+			case <-c.ticker.C:
+				c.Read()
+			}
+		}
+	}
+}
+
+func (c *Channel) Read() {
+	err := c.getImage()
 	if err != nil {
-		log.Warn(fmt.Sprintf("failed to inititate channel: %v", err))
+		log.Warn(fmt.Sprintf("failed to read image: %v", err))
 		return
 	}
 
-	for c.init {
-		select {
-		case <-c.StopChannel:
-			c.close()
-		default:
-			c.Read()
-		}
-	}
+	go c.encodeImage()
 }
 
 func (c *Channel) getImage() error {
@@ -104,31 +108,21 @@ func (c *Channel) getImage() error {
 	return nil
 }
 
-func (c *Channel) Read() {
-	err := c.getImage()
-	if err != nil {
-		log.Warn(fmt.Sprintf("failed to read image: %v", err))
-		return
-	}
-
-	*c.queue <- c.encodeImage()
-}
-
-func (c *Channel) encodeImage() []byte {
+func (c *Channel) encodeImage() {
 	const jpegQuality = 50
 
 	jpegOption := &jpeg.Options{Quality: jpegQuality}
 
 	image, err := c.image.ToImage()
 	if err != nil {
-		return nil
+		log.Warn(fmt.Sprintf("Failed to change to image: %v", err))
 	}
 
 	buf := new(bytes.Buffer)
 	err = jpeg.Encode(buf, image, jpegOption)
 	if err != nil {
-		return nil
+		log.Warn(fmt.Sprintf("Failed to encode image: %v", err))
 	}
 
-	return buf.Bytes()
+	*c.Queue <- buf.Bytes()
 }

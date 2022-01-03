@@ -1,6 +1,7 @@
 package channels
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -36,13 +37,21 @@ func Create(attempts int) (*Channels, error) {
 }
 
 func (c *Channels) getVids() ([]int, error) {
+	vids := make([]int, 0)
+	if core.Config.VidsString != "" {
+		err := json.Unmarshal([]byte(core.Config.VidsString), &vids)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse confiuration of vids: %v", err)
+		}
+		return vids, nil
+	}
+
 	devs, err := os.ReadDir("/dev")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read dir /dev: %v", err)
 	}
 	re := regexp.MustCompile("[0-9]+")
 
-	var vids []int
 	for _, vid := range devs {
 		if strings.Contains(vid.Name(), "video") {
 			log.V5(vid.Name())
@@ -74,7 +83,6 @@ func (c *Channels) DetectCameras() error {
 				continue
 			} else {
 				c.Array = append(c.Array, channel)
-				channel.close()
 			}
 		}
 
@@ -88,9 +96,21 @@ func (c *Channels) DetectCameras() error {
 	return nil
 }
 
-func (c *Channels) Start(q *chan []byte, loop int) {
+func (c *Channels) Start(loop int, channel int) {
+	if core.Config.Parallel {
+		c.startParallel(channel)
+	} else {
+		c.startRotating(loop)
+	}
+}
+
+func (c *Channels) startParallel(channel int) {
+	c.Array[channel].Start()
+}
+
+func (c *Channels) startRotating(loop int) {
 	if !c.Started {
-		go c.Array[c.Active].Start(q)
+		go c.Array[c.Active].Start()
 		c.Started = true
 	}
 
@@ -104,12 +124,12 @@ func (c *Channels) Start(q *chan []byte, loop int) {
 	for {
 		select {
 		case <-c.ticker.C:
-			c.Switch(q)
+			c.Switch()
 		}
 	}
 }
 
-func (c *Channels) Switch(q *chan []byte) {
+func (c *Channels) Switch() {
 	if len(c.Array) <= 1 {
 		return
 	}
@@ -119,14 +139,13 @@ func (c *Channels) Switch(q *chan []byte) {
 	if c.Active >= len(c.Array) {
 		c.Active = 0
 	}
-	go c.Array[c.Active].Start(q)
+	go c.Array[c.Active].Start()
 	log.V5(fmt.Sprintf("Starting Channel %v", c.Active))
 }
 
-//func (c *Channels) Stop(num int) {
-//	if c.Started[num] {
-//		c.Array[num].StopChannel <- "stop"
-//		c.Started[num] = false
-//		log.V5(fmt.Sprintf("Stopped channel - %v", num))
-//	}
-//}
+func (c *Channels) Stop(num int) {
+	if c.Array[num].started {
+		c.Array[num].StopChannel <- "stop"
+		log.V5(fmt.Sprintf("Stopped channel - %v", num))
+	}
+}

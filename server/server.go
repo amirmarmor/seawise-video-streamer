@@ -31,7 +31,7 @@ type Server struct {
 	DeviceInfo *DeviceInfo
 	Router     *mux.Router
 	Channels   *channels.Channels
-	Streamer   *Streamer
+	Streamers  []*Streamer
 	Platform   string
 }
 
@@ -58,13 +58,13 @@ func Produce(channels *channels.Channels) *Server {
 		}
 	}
 
-	for server.Streamer == nil {
-		server.Streamer = CreateStreamer(server.DeviceInfo.Port)
+	for i, channel := range server.Channels.Array {
+		server.Streamers = append(server.Streamers, CreateStreamer(server.DeviceInfo.Port+i, channel.Queue))
 	}
 
 	server.Router = mux.NewRouter()
-	server.Router.HandleFunc("/start", server.StartHandler)
-	//server.Router.HandleFunc("/stop/{num}", server.StopHandler)
+	server.Router.HandleFunc("/start/{ch}", server.StartHandler)
+	server.Router.HandleFunc("/stop/{num}", server.StopHandler)
 	server.Router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
 		if err != nil {
@@ -186,28 +186,49 @@ func (s *Server) getIp() (string, error) {
 
 func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	var response string
-	go s.Channels.Start(s.Streamer.Queue, s.DeviceInfo.Loop)
+	vars := mux.Vars(r)
+	ch := vars["ch"]
+	if ch == "" {
+		log.Warn(fmt.Sprintf("invalid address"))
+		sendErrorMessage(w)
+	}
+
+	channel, err := strconv.Atoi(ch)
+	if err != nil {
+		log.Warn(fmt.Sprintf("invalid address"))
+		sendErrorMessage(w)
+	}
+
+	go s.Channels.Start(s.DeviceInfo.Loop, channel)
 	response = "starting..."
 
-	_, err := w.Write([]byte(response))
+	_, err = w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}
 }
 
-//func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
-//	vars := mux.Vars(r)
-//	cam, err := strconv.Atoi(vars["num"])
-//	var response string
-//	if err != nil || cam > s.DeviceInfo.Channels {
-//		response = fmt.Sprintf("Invalid camera number - %v", cam)
-//		log.Warn(response)
-//	} else {
-//		go s.Channels.Stop(cam)
-//		response = "stopping..."
-//	}
-//	_, err = w.Write([]byte(response))
-//	if err != nil {
-//		panic(err)
-//	}
-//}
+func sendErrorMessage(w http.ResponseWriter) {
+	w.WriteHeader(500)
+	_, err := w.Write([]byte("an error occured"))
+	if err != nil {
+		log.Warn("failed to write response")
+	}
+}
+
+func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
+	var response string
+	vars := mux.Vars(r)
+	cam, err := strconv.Atoi(vars["num"])
+	if err != nil || cam > s.DeviceInfo.Channels {
+		response = fmt.Sprintf("Invalid camera number - %v", cam)
+		log.Warn(response)
+	} else {
+		go s.Channels.Stop(cam)
+		response = "stopping..."
+	}
+	_, err = w.Write([]byte(response))
+	if err != nil {
+		panic(err)
+	}
+}

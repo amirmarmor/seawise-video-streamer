@@ -20,13 +20,12 @@ type Streamer struct {
 	Queue                   *chan []byte
 }
 
-func CreateStreamer(port int) *Streamer {
-	q := make(chan []byte)
+func CreateStreamer(port int, q *chan []byte) *Streamer {
 	streamer := &Streamer{
-		Queue:                   &q,
 		port:                    port,
 		timeStampPacketSize:     8,
 		contentLengthPacketSize: 8,
+		Queue:                   q,
 	}
 
 	streamer.connect()
