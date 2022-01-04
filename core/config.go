@@ -14,6 +14,7 @@ type Configuration = struct {
 	BackendPort string
 	VidsString  string
 	Parallel    bool
+	Retries     int
 }
 
 var Config Configuration
@@ -24,6 +25,7 @@ func InitFlags() {
 	flag.StringVar(&Config.Port, "port", ":4000", "port")
 	flag.StringVar(&Config.VidsString, "vids", "[0,2]", "set known vid numbers")
 	flag.BoolVar(&Config.Parallel, "parallel", true, "record videos in parallel or in a loop")
+	flag.IntVar(&Config.Retries, "retries", 5000, "number of register retries")
 
 	log.AddNotify(postParse)
 }

@@ -105,7 +105,7 @@ func (c *Channels) Start(loop int, channel int) {
 }
 
 func (c *Channels) startParallel(channel int) {
-	c.Array[channel].Start()
+	go c.Array[channel].Start()
 }
 
 func (c *Channels) startRotating(loop int) {

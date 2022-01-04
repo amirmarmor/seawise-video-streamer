@@ -46,7 +46,7 @@ func Produce(channels *channels.Channels) *Server {
 
 	log.V5("REGISTERING DEVICE - " + server.Backend)
 
-	for attempt < 5 {
+	for attempt < core.Config.Retries {
 		err := server.Register(len(channels.Array))
 		if err != nil {
 			log.Warn(fmt.Sprintf("failed to register: %v", err))
@@ -54,7 +54,7 @@ func Produce(channels *channels.Channels) *Server {
 			attempt++
 			time.Sleep(3 * time.Second)
 		} else {
-			attempt = 5
+			attempt = core.Config.Retries + 1
 		}
 	}
 
@@ -200,7 +200,7 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 		sendErrorMessage(w)
 	}
 
-	go s.Channels.Start(s.DeviceInfo.Loop, channel)
+	s.Channels.Start(s.DeviceInfo.Loop, channel)
 	response = "starting..."
 
 	_, err = w.Write([]byte(response))
