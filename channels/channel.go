@@ -92,7 +92,7 @@ func (c *Channel) Read() {
 		//return
 	}
 
-	go c.encodeImage()
+	c.encodeImage()
 }
 
 func (c *Channel) getImage() error {
