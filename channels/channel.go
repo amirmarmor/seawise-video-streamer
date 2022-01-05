@@ -47,7 +47,7 @@ func (c *Channel) Init() error {
 	//vc.Set(gocv.VideoCaptureFPS, 10)
 	vc.Set(gocv.VideoCaptureFrameWidth, 1920)
 	vc.Set(gocv.VideoCaptureFrameHeight, 1024)
-	vc.Set(gocv.VideoCaptureBufferSize, 1)
+	vc.Set(gocv.VideoCaptureBufferSize, 10)
 
 	img := gocv.NewMat()
 	//defer img.Close()
@@ -73,7 +73,7 @@ func (c *Channel) Start() {
 	if !c.started {
 		c.started = true
 
-		c.ticker = time.NewTicker(10 * time.Millisecond)
+		c.ticker = time.NewTicker(30 * time.Millisecond)
 		for c.init {
 			select {
 			case <-c.StopChannel:
