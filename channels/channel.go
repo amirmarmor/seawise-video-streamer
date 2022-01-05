@@ -73,7 +73,7 @@ func (c *Channel) Start() {
 	if !c.started {
 		c.started = true
 
-		c.ticker = time.NewTicker(30 * time.Millisecond)
+		c.ticker = time.NewTicker(50 * time.Millisecond)
 		for c.init {
 			select {
 			case <-c.StopChannel:
