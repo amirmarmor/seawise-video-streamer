@@ -79,7 +79,7 @@ func (c *Channel) Start() {
 			case <-c.StopChannel:
 				c.stop()
 			case <-c.ticker.C:
-				c.Read()
+				go c.Read()
 			}
 		}
 	}
@@ -92,7 +92,7 @@ func (c *Channel) Read() {
 		//return
 	}
 
-	go c.encodeImage()
+	c.encodeImage()
 }
 
 func (c *Channel) getImage() error {
