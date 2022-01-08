@@ -266,6 +266,7 @@ func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	time.Sleep(1 * time.Second)
 	go func() {
 		err = s.Server.Shutdown(context.Background())
 		if err != nil {
