@@ -23,15 +23,12 @@ func (p *EntryPoint) Run() {
 	log.Info("Starting")
 
 	p.buildBlocks()
-	//p.addHandlers()
-	cleanSigTerm := Produce()
-	err := http.ListenAndServe(core.Config.Port, p.server.Router)
-	if err != nil {
+
+	err := p.server.Server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
 		log.Fatal(fmt.Sprintf("Server down: %v", err))
 	}
-	//go p.capt.Start()
-
-	cleanSigTerm.WaitForTermination()
+	log.V5("Finished")
 }
 
 func (p *EntryPoint) buildBlocks() {

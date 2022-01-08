@@ -42,15 +42,13 @@ func (c *Channel) Init() error {
 	if err != nil {
 		return fmt.Errorf("Init failed to capture video %v: ", err)
 	}
-	//defer vc.Close()
 
 	//vc.Set(gocv.VideoCaptureFPS, 10)
 	vc.Set(gocv.VideoCaptureFrameWidth, 1920)
 	vc.Set(gocv.VideoCaptureFrameHeight, 1024)
-	vc.Set(gocv.VideoCaptureBufferSize, 10)
+	vc.Set(gocv.VideoCaptureBufferSize, 1)
 
 	img := gocv.NewMat()
-	//defer img.Close()
 
 	ok := vc.Read(&img)
 	if !ok {
@@ -73,10 +71,11 @@ func (c *Channel) Start() {
 	if !c.started {
 		c.started = true
 
-		c.ticker = time.NewTicker(1 * time.Millisecond)
+		c.ticker = time.NewTicker(30 * time.Millisecond)
 		for c.init {
 			select {
-			case <-c.StopChannel:
+			case code := <-c.StopChannel:
+				log.V5("STOPP - %v", code)
 				c.stop()
 			case <-c.ticker.C:
 				c.Read()
@@ -89,10 +88,9 @@ func (c *Channel) Read() {
 	err := c.getImage()
 	if err != nil {
 		log.Warn(fmt.Sprintf("failed to read image: %v", err))
-		//return
 	}
 
-	c.encodeImage()
+	go c.encodeImage()
 }
 
 func (c *Channel) getImage() error {
@@ -125,4 +123,23 @@ func (c *Channel) encodeImage() {
 	}
 
 	*c.Queue <- buf.Bytes()
+}
+
+func (c *Channel) close() error {
+	if c.ticker != nil {
+		c.ticker.Stop()
+	}
+
+	err := c.capture.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close video channel: %v", err)
+	}
+	err = c.image.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close image: %v", err)
+	}
+	c.init = false
+	c.started = false
+
+	return nil
 }

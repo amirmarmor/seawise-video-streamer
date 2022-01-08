@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -29,7 +30,7 @@ type DeviceInfo struct {
 type Server struct {
 	Backend    string
 	DeviceInfo *DeviceInfo
-	Router     *mux.Router
+	Server     *http.Server
 	Channels   *channels.Channels
 	Streamers  []*Streamer
 	Platform   string
@@ -62,16 +63,21 @@ func Produce(channels *channels.Channels) *Server {
 		server.Streamers = append(server.Streamers, CreateStreamer(server.DeviceInfo.Port+i, channel.Queue))
 	}
 
-	server.Router = mux.NewRouter()
-	server.Router.HandleFunc("/restart", server.RestartHandler)
-	server.Router.HandleFunc("/start/{ch}", server.StartHandler)
-	server.Router.HandleFunc("/stop/{num}", server.StopHandler)
-	server.Router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+	router := mux.NewRouter()
+	router.HandleFunc("/shutdown", server.ShutdownHandler)
+	router.HandleFunc("/start/{ch}", server.StartHandler)
+	router.HandleFunc("/stop/{num}", server.StopHandler)
+	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
 		if err != nil {
 			log.Warn(fmt.Sprintf("unable to write response on health check: %v", err))
 		}
 	})
+
+	server.Server = &http.Server{
+		Addr:    core.Config.Port,
+		Handler: router,
+	}
 
 	return server
 }
@@ -200,7 +206,7 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 		sendErrorMessage(w)
 	}
 
-	s.Channels.Start(s.DeviceInfo.Loop, channel)
+	s.Channels.Start(channel)
 	response = "starting..."
 
 	_, err = w.Write([]byte(response))
@@ -226,19 +232,46 @@ func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) RestartHandler(w http.ResponseWriter, r *http.Request) {
-	response := "Rebooting..."
-	_, err := w.Write([]byte(response))
+func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
+	response := "Shutting down..."
+
+	err := s.Channels.Close()
+	if err != nil {
+		log.Warn(fmt.Sprintf("failed to close - %v", err))
+		sendErrorMessage(w)
+		return
+	}
+
+	for _, streamer := range s.Streamers {
+		streamer.Stop()
+	}
+
+	log.V5("HERERERRRR")
+	//err = s.Channels.DetectCameras()
+	//if err != nil {
+	//	log.Warn(fmt.Sprintf("failed to re-detect cameras - %v", err))
+	//	sendErrorMessage(w)
+	//	return
+	//}
+
+	//err = s.Register(len(s.Channels.Array))
+	//if err != nil {
+	//	log.Warn(fmt.Sprintf("failed to re-register - %v", err))
+	//	sendErrorMessage(w)
+	//	return
+	//}
+
+	_, err = w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}
 
-	cmd := exec.Command("sudo", "shutdown", "-r", "now")
-	_, err = cmd.Output()
-	if err != nil {
-		log.Warn("Failed to reboot")
-		return
-	}
+	go func() {
+		err = s.Server.Shutdown(context.Background())
+		if err != nil {
+			log.Fatal(fmt.Sprintf("Failed to shutdown server - %v", err))
+		}
+	}()
 }
 
 func sendErrorMessage(w http.ResponseWriter) {

@@ -7,25 +7,19 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
 
 type Channels struct {
-	counter  int
 	Array    []*Channel
 	attempts int
 	Started  bool
-	Active   int
-	ticker   *time.Ticker
 }
 
 func Create(attempts int) (*Channels, error) {
 	chs := &Channels{
 		attempts: attempts,
-		ticker:   time.NewTicker(10 * time.Second),
-		Active:   0,
 	}
 
 	err := chs.DetectCameras()
@@ -96,51 +90,8 @@ func (c *Channels) DetectCameras() error {
 	return nil
 }
 
-func (c *Channels) Start(loop int, channel int) {
-	if core.Config.Parallel {
-		c.startParallel(channel)
-	} else {
-		c.startRotating(loop)
-	}
-}
-
-func (c *Channels) startParallel(channel int) {
+func (c *Channels) Start(channel int) {
 	go c.Array[channel].Start()
-}
-
-func (c *Channels) startRotating(loop int) {
-	if !c.Started {
-		go c.Array[c.Active].Start()
-		c.Started = true
-	}
-
-	if loop == 0 {
-		loop = core.DefaultLoop
-	}
-
-	c.ticker = time.NewTicker(time.Duration(loop) * time.Second)
-
-	log.V5(fmt.Sprintf("Starting with loop interval of %v", loop))
-	for {
-		select {
-		case <-c.ticker.C:
-			c.Switch()
-		}
-	}
-}
-
-func (c *Channels) Switch() {
-	if len(c.Array) <= 1 {
-		return
-	}
-	log.V5(fmt.Sprintf("Stopping Channel %v", c.Active))
-	c.Array[c.Active].StopChannel <- "stop"
-	c.Active += 1
-	if c.Active >= len(c.Array) {
-		c.Active = 0
-	}
-	go c.Array[c.Active].Start()
-	log.V5(fmt.Sprintf("Starting Channel %v", c.Active))
 }
 
 func (c *Channels) Stop(num int) {
@@ -148,4 +99,18 @@ func (c *Channels) Stop(num int) {
 		c.Array[num].StopChannel <- "stop"
 		log.V5(fmt.Sprintf("Stopped channel - %v", num))
 	}
+	log.V5(fmt.Sprintf("channel %v not started", num))
+}
+
+func (c *Channels) Close() error {
+	for i, channel := range c.Array {
+		c.Stop(i)
+		err := channel.close()
+		if err != nil {
+			return fmt.Errorf("failed to close channel %v: %v", i, err)
+		}
+	}
+	c.Array = c.Array[:0]
+	c.Started = false
+	return nil
 }
