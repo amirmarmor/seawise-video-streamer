@@ -121,7 +121,6 @@ func (c *Channel) encodeImage() {
 	if err != nil {
 		log.Warn(fmt.Sprintf("Failed to encode image: %v", err))
 	}
-
 	*c.Queue <- buf.Bytes()
 }
 
