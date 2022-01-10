@@ -95,7 +95,7 @@ func (c *Channels) Start(channel int) {
 	if !c.Started {
 		for _, ch := range c.Array {
 			go ch.Start()
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
