@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
@@ -91,7 +92,12 @@ func (c *Channels) DetectCameras() error {
 }
 
 func (c *Channels) Start(channel int) {
-	go c.Array[channel].Start()
+	if !c.Started {
+		for _, ch := range c.Array {
+			go ch.Start()
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
 }
 
 func (c *Channels) Stop(num int) {

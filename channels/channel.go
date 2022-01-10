@@ -75,7 +75,7 @@ func (c *Channel) Start() {
 		for c.init {
 			select {
 			case code := <-c.StopChannel:
-				log.V5("STOPP - %v", code)
+				log.V5("STOP - %v", code)
 				c.stop()
 			case <-c.ticker.C:
 				c.Read()
