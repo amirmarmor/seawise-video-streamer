@@ -18,14 +18,16 @@ type Streamer struct {
 	contentLengthPacketSize uint
 	Router                  *mux.Router
 	Queue                   *chan []byte
+	Problems                *chan string
 }
 
-func CreateStreamer(port int, q *chan []byte) *Streamer {
+func CreateStreamer(port int, q *chan []byte, problems *chan string) *Streamer {
 	streamer := &Streamer{
 		port:                    port,
 		timeStampPacketSize:     8,
 		contentLengthPacketSize: 8,
 		Queue:                   q,
+		Problems:                problems,
 	}
 
 	streamer.connect()
@@ -42,7 +44,7 @@ func (s *Streamer) connect() {
 	if err != nil {
 		log.Warn(fmt.Sprintf("generate udp client failed! - %v", err))
 		time.Sleep(time.Second * 3)
-		go s.connect()
+		*s.Problems <- "disconnect"
 		return
 	}
 

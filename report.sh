@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BEHOST="127.0.0.1:8080"
+BEHOST="192.168.1.11:8080"
 n=0
 
 until [ "$n" -ge 5 ]

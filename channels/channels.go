@@ -22,7 +22,8 @@ type Channels struct {
 
 func Create(attempts int) (*Channels, error) {
 	chs := &Channels{
-		attempts: attempts,
+		attempts:    attempts,
+		StopChannel: make(chan string),
 	}
 
 	err := chs.DetectCameras()
@@ -96,13 +97,12 @@ func (c *Channels) DetectCameras() error {
 func (c *Channels) Start() {
 	if !c.Started {
 		c.Started = true
-		c.timer = time.NewTicker(100 * time.Millisecond)
+		c.timer = time.NewTicker(50 * time.Millisecond)
 
 		for c.Started {
 			select {
 			case code := <-c.StopChannel:
-				log.V5("STOP - %v", code)
-				c.Stop()
+				c.Stop(code)
 			case <-c.timer.C:
 				c.Stream()
 			}
@@ -117,18 +117,18 @@ func (c *Channels) Stream() {
 	}
 }
 
-func (c *Channels) Stop() {
+func (c *Channels) Stop(code string) {
+	log.V5("STOP - %v", code)
 	c.Started = false
 }
 
-func (c *Channels) Close() error {
+func (c *Channels) Close() {
 	for i, channel := range c.Array {
 		err := channel.close()
 		if err != nil {
-			return fmt.Errorf("failed to close channel %v: %v", i, err)
+			log.Warn(fmt.Sprintf("failed to close channel %v: %v", i, err))
 		}
 	}
 	c.Array = c.Array[:0]
 	c.Started = false
-	return nil
 }

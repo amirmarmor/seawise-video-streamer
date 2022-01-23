@@ -28,45 +28,33 @@ type DeviceInfo struct {
 }
 
 type Server struct {
+	Started    bool
 	Backend    string
 	DeviceInfo *DeviceInfo
 	Server     *http.Server
 	Channels   *channels.Channels
 	Streamers  []*Streamer
 	Platform   string
+	Problems   chan string
 }
 
 func Produce(channels *channels.Channels) *Server {
-	attempt := 0
 	backend := fmt.Sprintf("http://%v:%v", core.Config.BackendHost, core.Config.BackendPort)
 
 	server := &Server{
 		Backend:  backend,
 		Channels: channels,
+		Problems: make(chan string),
 	}
 
 	log.V5("REGISTERING DEVICE - " + server.Backend)
 
-	for attempt < core.Config.Retries {
-		err := server.Register(len(channels.Array))
-		if err != nil {
-			log.Warn(fmt.Sprintf("failed to register: %v", err))
-			log.Warn(fmt.Sprintf("Retrying to register - attempt %v", strconv.Itoa(attempt)))
-			attempt++
-			time.Sleep(3 * time.Second)
-		} else {
-			attempt = core.Config.Retries + 1
-		}
-	}
-
-	for i, channel := range server.Channels.Array {
-		server.Streamers = append(server.Streamers, CreateStreamer(server.DeviceInfo.Port+i, channel.Queue))
-	}
+	server.TryRegister()
 
 	router := mux.NewRouter()
 	router.HandleFunc("/shutdown", server.ShutdownHandler)
-	router.HandleFunc("/start/{ch}", server.StartHandler)
-	router.HandleFunc("/stop/{num}", server.StopHandler)
+	router.HandleFunc("/start", server.StartHandler)
+	router.HandleFunc("/stop", server.StopHandler)
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
 		if err != nil {
@@ -79,6 +67,7 @@ func Produce(channels *channels.Channels) *Server {
 		Handler: router,
 	}
 
+	go server.handleProblems()
 	return server
 }
 
@@ -192,8 +181,23 @@ func (s *Server) getIp() (string, error) {
 }
 
 func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
-	s.Channels.Start()
-	response := "starting..."
+	response := "Already started"
+	if s.Started {
+		_, err := w.Write([]byte(response))
+		if err != nil {
+			panic(err)
+		}
+		return
+	}
+
+	response = "starting..."
+	s.Started = true
+
+	for i, channel := range s.Channels.Array {
+		s.Streamers = append(s.Streamers, CreateStreamer(s.DeviceInfo.Port+i, channel.Queue, &s.Problems))
+	}
+
+	go s.Channels.Start()
 
 	_, err := w.Write([]byte(response))
 	if err != nil {
@@ -202,7 +206,9 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
-	go s.Channels.Stop()
+	s.Channels.StopChannel <- "stop"
+	time.Sleep(3 * time.Second)
+	s.Started = false
 	response := "stopping..."
 	_, err := w.Write([]byte(response))
 	if err != nil {
@@ -213,12 +219,7 @@ func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	response := "Shutting down..."
 
-	err := s.Channels.Close()
-	if err != nil {
-		log.Warn(fmt.Sprintf("failed to close - %v", err))
-		sendErrorMessage(w)
-		return
-	}
+	s.Channels.Close()
 
 	for _, streamer := range s.Streamers {
 		streamer.Stop()
@@ -239,7 +240,7 @@ func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//	return
 	//}
 
-	_, err = w.Write([]byte(response))
+	_, err := w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}
@@ -253,10 +254,41 @@ func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func sendErrorMessage(w http.ResponseWriter) {
-	w.WriteHeader(500)
-	_, err := w.Write([]byte("an error occured"))
-	if err != nil {
-		log.Warn("failed to write response")
+func (s *Server) handleProblems() {
+	for {
+		select {
+		case problem := <-s.Problems:
+			s.problemHandler(problem)
+		}
 	}
+}
+
+func (s *Server) problemHandler(problem string) {
+	log.V5("Problem - %v", problem)
+	s.Channels.StopChannel <- "stop"
+	time.Sleep(3 * time.Second)
+	s.TryRegister()
+}
+
+func (s *Server) TryRegister() {
+	attempt := 0
+	trying := true
+	for trying {
+		if attempt > core.Config.Retries {
+			trying = false
+			panic(fmt.Sprintf("failed to register after all attempts, stopping"))
+		}
+
+		err := s.Register(len(s.Channels.Array))
+		if err != nil {
+			log.Warn(fmt.Sprintf("failed to register: %v", err))
+			log.Warn(fmt.Sprintf("Retrying to register - attempt %v", strconv.Itoa(attempt)))
+			attempt++
+			time.Sleep(3 * time.Second)
+		} else {
+			trying = false
+		}
+	}
+
+	return
 }

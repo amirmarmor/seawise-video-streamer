@@ -33,10 +33,6 @@ func (p *EntryPoint) Run() {
 
 func (p *EntryPoint) buildBlocks() {
 	var err error
-	//p.manager, err = core.Produce()
-	//if err != nil {
-	//	panic(err)
-	//}
 
 	p.channels, err = channels.Create(5)
 	if err != nil {
