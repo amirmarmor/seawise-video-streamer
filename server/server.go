@@ -192,41 +192,19 @@ func (s *Server) getIp() (string, error) {
 }
 
 func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
-	var response string
-	vars := mux.Vars(r)
-	ch := vars["ch"]
-	if ch == "" {
-		log.Warn(fmt.Sprintf("invalid address"))
-		sendErrorMessage(w)
-	}
+	s.Channels.Start()
+	response := "starting..."
 
-	channel, err := strconv.Atoi(ch)
-	if err != nil {
-		log.Warn(fmt.Sprintf("invalid address"))
-		sendErrorMessage(w)
-	}
-
-	s.Channels.Start(channel)
-	response = "starting..."
-
-	_, err = w.Write([]byte(response))
+	_, err := w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}
 }
 
 func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
-	var response string
-	vars := mux.Vars(r)
-	cam, err := strconv.Atoi(vars["num"])
-	if err != nil || cam > s.DeviceInfo.Channels {
-		response = fmt.Sprintf("Invalid camera number - %v", cam)
-		log.Warn(response)
-	} else {
-		go s.Channels.Stop(cam)
-		response = "stopping..."
-	}
-	_, err = w.Write([]byte(response))
+	go s.Channels.Stop()
+	response := "stopping..."
+	_, err := w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}

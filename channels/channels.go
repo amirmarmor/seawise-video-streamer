@@ -7,14 +7,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
 
 type Channels struct {
-	Array    []*Channel
-	attempts int
-	Started  bool
+	Array       []*Channel
+	attempts    int
+	Started     bool
+	timer       *time.Ticker
+	StopChannel chan string
 }
 
 func Create(attempts int) (*Channels, error) {
@@ -90,21 +93,36 @@ func (c *Channels) DetectCameras() error {
 	return nil
 }
 
-func (c *Channels) Start(channel int) {
-	go c.Array[channel].Start()
+func (c *Channels) Start() {
+	if !c.Started {
+		c.Started = true
+		c.timer = time.NewTicker(100 * time.Millisecond)
+
+		for c.Started {
+			select {
+			case code := <-c.StopChannel:
+				log.V5("STOP - %v", code)
+				c.Stop()
+			case <-c.timer.C:
+				c.Stream()
+			}
+		}
+	}
 }
 
-func (c *Channels) Stop(num int) {
-	if c.Array[num].started {
-		c.Array[num].StopChannel <- "stop"
-		log.V5(fmt.Sprintf("Stopped channel - %v", num))
+func (c *Channels) Stream() {
+	for _, channel := range c.Array {
+		channel.Read()
+		go channel.EncodeImage()
 	}
-	log.V5(fmt.Sprintf("channel %v not started", num))
+}
+
+func (c *Channels) Stop() {
+	c.Started = false
 }
 
 func (c *Channels) Close() error {
 	for i, channel := range c.Array {
-		c.Stop(i)
 		err := channel.close()
 		if err != nil {
 			return fmt.Errorf("failed to close channel %v: %v", i, err)

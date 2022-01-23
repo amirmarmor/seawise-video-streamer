@@ -5,33 +5,23 @@ import (
 	"fmt"
 	"gocv.io/x/gocv"
 	"image/jpeg"
-	"time"
 	"www.seawise.com/client/log"
 )
 
 type Channel struct {
-	started     bool
-	fps         int
-	name        int
-	init        bool
-	capture     *gocv.VideoCapture
-	image       gocv.Mat
-	StopChannel chan string
-	Queue       *chan []byte
-	ticker      *time.Ticker
-}
-
-type Recording struct {
-	isRecording bool
-	startTime   time.Time
+	fps     int
+	name    int
+	init    bool
+	capture *gocv.VideoCapture
+	image   gocv.Mat
+	Queue   *chan []byte
 }
 
 func CreateChannel(channelName int) *Channel {
 	q := make(chan []byte)
 	channel := &Channel{
-		name:        channelName,
-		StopChannel: make(chan string),
-		Queue:       &q,
+		name:  channelName,
+		Queue: &q,
 	}
 
 	return channel
@@ -61,36 +51,11 @@ func (c *Channel) Init() error {
 	return nil
 }
 
-func (c *Channel) stop() {
-	c.ticker.Stop()
-	c.started = false
-	log.V5("stopped....")
-}
-
-func (c *Channel) Start() {
-	if !c.started {
-		c.started = true
-
-		c.ticker = time.NewTicker(100 * time.Millisecond)
-		for c.init {
-			select {
-			case code := <-c.StopChannel:
-				log.V5("STOP - %v", code)
-				c.stop()
-			case <-c.ticker.C:
-				c.Read()
-			}
-		}
-	}
-}
-
 func (c *Channel) Read() {
 	err := c.getImage()
 	if err != nil {
 		log.Warn(fmt.Sprintf("failed to read image: %v", err))
 	}
-
-	go c.encodeImage()
 }
 
 func (c *Channel) getImage() error {
@@ -106,7 +71,7 @@ func (c *Channel) getImage() error {
 	return nil
 }
 
-func (c *Channel) encodeImage() {
+func (c *Channel) EncodeImage() {
 	const jpegQuality = 50
 
 	jpegOption := &jpeg.Options{Quality: jpegQuality}
@@ -125,10 +90,6 @@ func (c *Channel) encodeImage() {
 }
 
 func (c *Channel) close() error {
-	if c.ticker != nil {
-		c.ticker.Stop()
-	}
-
 	err := c.capture.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close video channel: %v", err)
@@ -137,8 +98,6 @@ func (c *Channel) close() error {
 	if err != nil {
 		return fmt.Errorf("failed to close image: %v", err)
 	}
-	c.init = false
-	c.started = false
 
 	return nil
 }
