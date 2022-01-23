@@ -36,7 +36,7 @@ func (c *Channel) Init() error {
 	//vc.Set(gocv.VideoCaptureFPS, 10)
 	vc.Set(gocv.VideoCaptureFrameWidth, 1920)
 	vc.Set(gocv.VideoCaptureFrameHeight, 1024)
-	vc.Set(gocv.VideoCaptureBufferSize, 10)
+	vc.Set(gocv.VideoCaptureBufferSize, 5)
 
 	img := gocv.NewMat()
 
