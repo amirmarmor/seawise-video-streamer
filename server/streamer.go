@@ -30,11 +30,10 @@ func CreateStreamer(port int, q *chan []byte, problems *chan string) *Streamer {
 		Problems:                problems,
 	}
 
-	streamer.connect()
 	return streamer
 }
 
-func (s *Streamer) connect() {
+func (s *Streamer) Connect() {
 	log.V5(fmt.Sprintf("opening socket on port: %v", s.port))
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
 		IP:   net.ParseIP(core.Config.BackendHost),
@@ -59,7 +58,7 @@ func (s *Streamer) handleSend() {
 		_, err := writer.Write(s.pack(pkt))
 		if err != nil {
 			log.Warn(fmt.Sprintf("Packet Send Failed! - %v", err))
-			go s.connect()
+			go s.Connect()
 			return
 		}
 	}

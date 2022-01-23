@@ -51,6 +51,10 @@ func Produce(channels *channels.Channels) *Server {
 
 	server.TryRegister()
 
+	for i, channel := range server.Channels.Array {
+		server.Streamers = append(server.Streamers, CreateStreamer(server.DeviceInfo.Port+i, channel.Queue, &server.Problems))
+	}
+
 	router := mux.NewRouter()
 	router.HandleFunc("/shutdown", server.ShutdownHandler)
 	router.HandleFunc("/start", server.StartHandler)
@@ -193,8 +197,8 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	response = "starting..."
 	s.Started = true
 
-	for i, channel := range s.Channels.Array {
-		s.Streamers = append(s.Streamers, CreateStreamer(s.DeviceInfo.Port+i, channel.Queue, &s.Problems))
+	for _, streamer := range s.Streamers {
+		streamer.Connect()
 	}
 
 	go s.Channels.Start()
@@ -258,7 +262,7 @@ func (s *Server) handleProblems() {
 	for {
 		select {
 		case problem := <-s.Problems:
-			s.problemHandler(problem)
+			go s.problemHandler(problem)
 		}
 	}
 }
@@ -267,6 +271,12 @@ func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
 	s.Channels.StopChannel <- "stop"
 	time.Sleep(3 * time.Second)
+
+	for _, streamer := range s.Streamers {
+		streamer.Stop()
+	}
+
+	s.Started = false
 	s.TryRegister()
 }
 
