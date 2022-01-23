@@ -113,7 +113,7 @@ func (c *Channels) Start() {
 func (c *Channels) Stream() {
 	for _, channel := range c.Array {
 		channel.Read()
-		channel.EncodeImage()
+		go channel.EncodeImage()
 	}
 }
 
