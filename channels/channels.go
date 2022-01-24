@@ -112,8 +112,8 @@ func (c *Channels) Start() {
 
 func (c *Channels) Stream() {
 	for _, channel := range c.Array {
-		channel.Read()
-		go channel.EncodeImage()
+		go channel.Read()
+		//go channel.EncodeImage()
 	}
 }
 
