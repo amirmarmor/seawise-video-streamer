@@ -97,7 +97,7 @@ func (c *Channels) DetectCameras() error {
 func (c *Channels) Start() {
 	if !c.Started {
 		c.Started = true
-		c.timer = time.NewTicker(500 * time.Millisecond)
+		c.timer = time.NewTicker(00 * time.Millisecond)
 
 		for c.Started {
 			select {
@@ -112,8 +112,8 @@ func (c *Channels) Start() {
 
 func (c *Channels) Stream() {
 	for _, channel := range c.Array {
-		channel.Read()
-		go channel.EncodeImage()
+		go channel.Read()
+		//go channel.EncodeImage()
 	}
 }
 
