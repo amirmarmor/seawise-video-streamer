@@ -22,7 +22,7 @@ func InitFlags() {
 	flag.StringVar(&Config.BackendHost, "behost", "localhost", "The backend host")
 	flag.StringVar(&Config.BackendPort, "beport", "8080", "The backend port")
 	flag.StringVar(&Config.Port, "port", ":4000", "port")
-	flag.StringVar(&Config.VidsString, "vids", "[0,2]", "set known vid numbers")
+	flag.StringVar(&Config.VidsString, "vids", "[0,2,4,6]", "set known vid numbers")
 	flag.IntVar(&Config.Retries, "retries", 5000, "number of register retries")
 
 	log.AddNotify(postParse)
