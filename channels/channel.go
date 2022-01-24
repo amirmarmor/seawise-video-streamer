@@ -55,6 +55,7 @@ func (c *Channel) Read() {
 	err := c.getImage()
 	if err != nil {
 		log.Warn(fmt.Sprintf("failed to read image: %v", err))
+		return
 	}
 
 	c.EncodeImage()
