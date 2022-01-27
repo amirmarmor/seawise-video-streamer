@@ -57,7 +57,7 @@ func Produce(channels *channels.Channels) *Server {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/shutdown", server.ShutdownHandler)
-	router.HandleFunc("/start", server.StartHandler)
+	router.HandleFunc("/start/{port}", server.StartHandler)
 	router.HandleFunc("/stop", server.StopHandler)
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
@@ -207,7 +207,7 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-}
+}		port:                    port,
 
 func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
 	s.Channels.StopChannel <- "stop"

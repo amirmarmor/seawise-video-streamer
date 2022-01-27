@@ -21,9 +21,8 @@ type Streamer struct {
 	Problems                *chan string
 }
 
-func CreateStreamer(port int, q *chan []byte, problems *chan string) *Streamer {
+func CreateStreamer(q *chan []byte, problems *chan string) *Streamer {
 	streamer := &Streamer{
-		port:                    port,
 		timeStampPacketSize:     8,
 		contentLengthPacketSize: 8,
 		Queue:                   q,
