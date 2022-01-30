@@ -92,7 +92,7 @@ func (c *Channel) EncodeImage() {
 		return
 	}
 
-	*c.Queue <- c.image.ToBytes()
+	*c.Queue <- buf.Bytes()
 }
 
 func (c *Channel) close() error {
