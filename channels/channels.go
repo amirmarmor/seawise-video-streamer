@@ -90,7 +90,7 @@ func (c *Channels) DetectCameras() error {
 func (c *Channels) Start() {
 	if !c.Started {
 		c.Started = true
-		c.timer = time.NewTicker(200 * time.Millisecond)
+		c.timer = time.NewTicker(50 * time.Millisecond)
 
 		for c.Started {
 			select {
