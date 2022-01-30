@@ -90,14 +90,14 @@ func (c *Channels) DetectCameras() error {
 func (c *Channels) Start() {
 	if !c.Started {
 		c.Started = true
-		c.timer = time.NewTicker(50 * time.Millisecond)
+		c.timer = time.NewTicker(200 * time.Millisecond)
 
 		for c.Started {
 			select {
 			case code := <-c.StopChannel:
 				c.Stop(code)
-				//case <-c.timer.C:
-			default:
+			case <-c.timer.C:
+				//default:
 				c.Stream()
 			}
 		}
