@@ -4,9 +4,10 @@ sudo rmmod uvcvideo
 sudo modprobe uvcvideo nodrop=1 timeout=10000 quirks=0x80
 
 export VERBOSE=5
-export BEHOST="192.168.60.106"
+export BEHOST="192.168.10.8"
+
 echo "connecting to " + $BEHOST
-cmd=./start
+cmd=/home/pi/seawise-video-streamer/start
 $cmd
 
 
