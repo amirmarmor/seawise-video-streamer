@@ -309,20 +309,21 @@ func (s *Server) TryRegister() {
 		return
 	}
 
-	err := s.Channels.DetectCameras()
-	if err != nil {
-		panic("failed to create channels!!!!!")
-	}
-
 	attempt := 0
 	trying := true
 	for trying {
+
+		err := s.Channels.DetectCameras()
+		if err != nil {
+			panic("failed to create channels!!!!!")
+		}
+
 		if attempt > core.Config.Retries {
 			trying = false
 			panic(fmt.Sprintf("failed to register after all attempts, stopping"))
 		}
 
-		err := s.Register(len(s.Channels.Array))
+		err = s.Register(len(s.Channels.Array))
 		if err != nil {
 			log.Warn(fmt.Sprintf("failed to register: %v", err))
 			log.Warn(fmt.Sprintf("Retrying to register - attempt %v", strconv.Itoa(attempt)))
