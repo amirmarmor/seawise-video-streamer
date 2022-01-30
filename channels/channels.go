@@ -20,18 +20,11 @@ type Channels struct {
 	StopChannel chan string
 }
 
-func Create(attempts int) (*Channels, error) {
-	chs := &Channels{
+func Create(attempts int) *Channels {
+	return &Channels{
 		attempts:    attempts,
 		StopChannel: make(chan string),
 	}
-
-	err := chs.DetectCameras()
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect cameras: %v", err)
-	}
-
-	return chs, nil
 }
 
 func (c *Channels) getVids() ([]int, error) {
@@ -97,13 +90,14 @@ func (c *Channels) DetectCameras() error {
 func (c *Channels) Start() {
 	if !c.Started {
 		c.Started = true
-		c.timer = time.NewTicker(300 * time.Millisecond)
+		c.timer = time.NewTicker(50 * time.Millisecond)
 
 		for c.Started {
 			select {
 			case code := <-c.StopChannel:
 				c.Stop(code)
-			case <-c.timer.C:
+			//case <-c.timer.C:
+			default:
 				c.Stream()
 			}
 		}
@@ -113,7 +107,6 @@ func (c *Channels) Start() {
 func (c *Channels) Stream() {
 	for _, channel := range c.Array {
 		channel.Read()
-		//go channel.EncodeImage()
 	}
 }
 

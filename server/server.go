@@ -36,28 +36,27 @@ type Server struct {
 	Streamers  []*Streamer
 	Platform   string
 	Problems   chan string
+	ticker     *time.Ticker
+	health     bool
 }
 
-func Produce(channels *channels.Channels) *Server {
+func Produce(chs *channels.Channels) *Server {
 	backend := fmt.Sprintf("http://%v:%v", core.Config.BackendHost, core.Config.BackendPort)
 
 	server := &Server{
 		Backend:  backend,
-		Channels: channels,
 		Problems: make(chan string),
+		ticker:   time.NewTicker(1 * time.Second),
+		Channels: chs,
 	}
 
 	log.V5("REGISTERING DEVICE - " + server.Backend)
 
 	server.TryRegister()
 
-	for i, channel := range server.Channels.Array {
-		server.Streamers = append(server.Streamers, CreateStreamer(server.DeviceInfo.Port+i, channel.Queue, &server.Problems))
-	}
-
 	router := mux.NewRouter()
 	router.HandleFunc("/shutdown", server.ShutdownHandler)
-	router.HandleFunc("/start/{port}", server.StartHandler)
+	router.HandleFunc("/start", server.StartHandler)
 	router.HandleFunc("/stop", server.StopHandler)
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
@@ -71,8 +70,42 @@ func Produce(channels *channels.Channels) *Server {
 		Handler: router,
 	}
 
+	server.health = true
 	go server.handleProblems()
+	go server.handleHealthCheck()
 	return server
+}
+
+func (s *Server) handleHealthCheck() {
+	for s.health {
+		select {
+		case <-s.ticker.C:
+			err := s.checkHealth()
+			if err != nil {
+				s.gracefullyShutdown()
+				s.TryRegister()
+			}
+		}
+	}
+}
+
+func (s *Server) checkHealth() error {
+	resp, err := http.Get(s.Backend + "/health")
+	if err != nil {
+		return fmt.Errorf("failed health check: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed health check: %v", err)
+	}
+
+	if string(body) != "ok" {
+		return fmt.Errorf("failed health check: %v", err)
+	}
+
+	return nil
 }
 
 func (s *Server) Register(channels int) error {
@@ -197,9 +230,9 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	response = "starting..."
 	s.Started = true
 
-	for _, streamer := range s.Streamers {
-		streamer.Connect()
-	}
+	//for _, streamer := range s.Streamers {
+	//streamer.Connect()
+	//}
 
 	go s.Channels.Start()
 
@@ -207,7 +240,7 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-}		port:                    port,
+}
 
 func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
 	s.Channels.StopChannel <- "stop"
@@ -223,12 +256,7 @@ func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	response := "Shutting down..."
 
-	s.Channels.Close()
-
-	for _, streamer := range s.Streamers {
-		streamer.Stop()
-	}
-
+	s.gracefullyShutdown()
 	log.V5("HERERERRRR")
 	//err = s.Channels.DetectCameras()
 	//if err != nil {
@@ -269,18 +297,23 @@ func (s *Server) handleProblems() {
 
 func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
-	s.Channels.StopChannel <- "stop"
-	time.Sleep(3 * time.Second)
-
-	for _, streamer := range s.Streamers {
-		streamer.Stop()
-	}
+	s.gracefullyShutdown()
 
 	s.Started = false
 	s.TryRegister()
 }
 
 func (s *Server) TryRegister() {
+	if len(s.Streamers) > 0 {
+		log.V5("already registered")
+		return
+	}
+
+	err := s.Channels.DetectCameras()
+	if err != nil {
+		panic("failed to create channels!!!!!")
+	}
+
 	attempt := 0
 	trying := true
 	for trying {
@@ -300,5 +333,31 @@ func (s *Server) TryRegister() {
 		}
 	}
 
+	for i, channel := range s.Channels.Array {
+		streamer := CreateStreamer(channel.Queue, &s.Problems)
+		streamer.Connect(s.DeviceInfo.Port + i)
+		s.Streamers = append(s.Streamers, streamer)
+	}
+
 	return
+}
+
+func (s *Server) gracefullyShutdown() {
+	if s.Started {
+		s.Started = false
+		s.Channels.StopChannel <- "stop"
+		go func() {
+			time.Sleep(1 * time.Second)
+			s.Channels.Close()
+		}()
+	}
+
+	if len(s.Streamers) > 0 {
+		for _, streamer := range s.Streamers {
+			streamer.Stop()
+		}
+		s.Streamers = s.Streamers[:0]
+	}
+
+	log.V5("shut down complete")
 }

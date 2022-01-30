@@ -32,12 +32,6 @@ func (p *EntryPoint) Run() {
 }
 
 func (p *EntryPoint) buildBlocks() {
-	var err error
-
-	p.channels, err = channels.Create(5)
-	if err != nil {
-		panic(err)
-	}
-
+	p.channels = channels.Create(5)
 	p.server = server.Produce(p.channels)
 }
