@@ -299,14 +299,10 @@ func (s *Server) handleProblems() {
 func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
 	s.gracefullyShutdown()
-	s.TryRegister()
+	//s.TryRegister()
 }
 
 func (s *Server) TryRegister() {
-	if s.Registering {
-		return
-	}
-
 	if len(s.Streamers) > 0 {
 		log.V5("already registered")
 		return
@@ -342,7 +338,6 @@ func (s *Server) TryRegister() {
 		s.Streamers = append(s.Streamers, streamer)
 	}
 
-	s.Registering = false
 	return
 }
 
