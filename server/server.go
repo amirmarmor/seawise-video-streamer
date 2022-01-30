@@ -28,16 +28,17 @@ type DeviceInfo struct {
 }
 
 type Server struct {
-	Started    bool
-	Backend    string
-	DeviceInfo *DeviceInfo
-	Server     *http.Server
-	Channels   *channels.Channels
-	Streamers  []*Streamer
-	Platform   string
-	Problems   chan string
-	ticker     *time.Ticker
-	health     bool
+	Started     bool
+	Registering bool
+	Backend     string
+	DeviceInfo  *DeviceInfo
+	Server      *http.Server
+	Channels    *channels.Channels
+	Streamers   []*Streamer
+	Platform    string
+	Problems    chan string
+	ticker      *time.Ticker
+	health      bool
 }
 
 func Produce(chs *channels.Channels) *Server {
@@ -298,12 +299,14 @@ func (s *Server) handleProblems() {
 func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
 	s.gracefullyShutdown()
-
-	s.Started = false
 	s.TryRegister()
 }
 
 func (s *Server) TryRegister() {
+	if s.Registering {
+		return
+	}
+
 	if len(s.Streamers) > 0 {
 		log.V5("already registered")
 		return
@@ -339,6 +342,7 @@ func (s *Server) TryRegister() {
 		s.Streamers = append(s.Streamers, streamer)
 	}
 
+	s.Registering = false
 	return
 }
 
