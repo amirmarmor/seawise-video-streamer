@@ -43,7 +43,7 @@ func (s *Streamer) Connect(port int) {
 	if err != nil {
 		log.Warn(fmt.Sprintf("generate udp client failed! - %v", err))
 		//time.Sleep(time.Second * 3)
-		//*s.Problems <- "disconnect"
+		*s.Problems <- "disconnect"
 		return
 	}
 

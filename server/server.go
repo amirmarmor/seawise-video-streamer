@@ -297,11 +297,10 @@ func (s *Server) handleProblems() {
 
 func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
-	return
-	//s.gracefullyShutdown()
-	//
-	//s.Started = false
-	//s.TryRegister()
+	s.gracefullyShutdown()
+
+	s.Started = false
+	s.TryRegister()
 }
 
 func (s *Server) TryRegister() {
