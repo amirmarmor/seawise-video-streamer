@@ -96,8 +96,8 @@ func (c *Channels) Start() {
 			select {
 			case code := <-c.StopChannel:
 				c.Stop(code)
-				//case <-c.timer.C:
-			default:
+			case <-c.timer.C:
+				//default:
 				c.Stream()
 			}
 		}
