@@ -1,8 +1,10 @@
 package channels
 
 import (
+	"bytes"
 	"fmt"
 	"gocv.io/x/gocv"
+	"image/jpeg"
 	"www.seawise.com/client/log"
 )
 
@@ -55,6 +57,8 @@ func (c *Channel) Read() {
 		log.Warn(fmt.Sprintf("failed to read image: %v", err))
 		return
 	}
+
+	c.EncodeImage()
 }
 
 func (c *Channel) getImage() error {
@@ -67,8 +71,28 @@ func (c *Channel) getImage() error {
 		return fmt.Errorf("Empty Image")
 	}
 
-	*c.Queue <- c.image.ToBytes()
 	return nil
+}
+
+func (c *Channel) EncodeImage() {
+	const jpegQuality = 50
+
+	jpegOption := &jpeg.Options{Quality: jpegQuality}
+
+	image, err := c.image.ToImage()
+	if err != nil {
+		log.Warn(fmt.Sprintf("Failed to change to image: %v", err))
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	err = jpeg.Encode(buf, image, jpegOption)
+	if err != nil {
+		log.Warn(fmt.Sprintf("Failed to encode image: %v", err))
+		return
+	}
+
+	*c.Queue <- c.image.ToBytes()
 }
 
 func (c *Channel) close() error {
