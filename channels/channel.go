@@ -63,6 +63,7 @@ func (c *Channel) getImage() error {
 		return fmt.Errorf("read encountered channel closed %v\n", c.name)
 	}
 
+	log.V5(fmt.Sprintf("%v-%v-%v"), c.image.Cols(), c.image.Rows(), c.image.Type())
 	if c.image.Empty() {
 		return fmt.Errorf("Empty Image")
 	}
