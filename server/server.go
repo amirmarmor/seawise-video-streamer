@@ -142,6 +142,7 @@ func (s *Server) Register(channels int) error {
 	var body []byte
 	body, err = s.post(url, postBody)
 	if err != nil {
+		log.Warn(fmt.Sprintf("got error on register: %v", err))
 		return fmt.Errorf("failed to register device no connectivity: %v", err)
 	}
 
@@ -357,6 +358,6 @@ func (s *Server) gracefullyShutdown() {
 		}
 		s.Streamers = s.Streamers[:0]
 	}
-
+	time.Sleep(1 * time.Second)
 	log.V5("shut down complete")
 }
