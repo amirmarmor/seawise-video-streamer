@@ -37,18 +37,19 @@ func (s *Streamer) Connect(port int) {
 	log.V5(fmt.Sprintf("opening socket on port: %v", s.port))
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
 		IP:   net.ParseIP(core.Config.BackendHost),
-		Port: port,
+		Port: s.port,
 	})
 
 	if err != nil {
 		log.Warn(fmt.Sprintf("generate udp client failed! - %v", err))
-		//time.Sleep(time.Second * 3)
+		time.Sleep(time.Second * 3)
 		*s.Problems <- "disconnect"
 		return
 	}
 
 	s.TCPConn = conn
 	go s.handleSend()
+	log.V5("done connecting")
 	return
 }
 
