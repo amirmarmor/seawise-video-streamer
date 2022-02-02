@@ -10,7 +10,7 @@ n=0
 until [ "$n" -ge 5 ]
 do
   echo "attempt $n - $url"
-  echo data
+  echo $data
   curl -X POST -H "Content-Type: application/json" -d "$data" "$url" && break
   n=$((n+1))
   sleep 15
