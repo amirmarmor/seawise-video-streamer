@@ -3,7 +3,7 @@
 host="192.168.10.8:8080"
 sn="$(cat /proc/cpuinfo | grep Serial | cut -d ' ' -f 2)"
 url="http://$host/report"
-ip="$(/sbin/ip -o -4 addr list wlan0 | awk '{print $4}' | cut -d)"
+ip="$(/sbin/ip -o -4 addr list wlan0 | awk '{print $4}' | cut -d/ -f1)"
 
 n=0
 
