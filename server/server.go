@@ -28,6 +28,7 @@ type DeviceInfo struct {
 }
 
 type Server struct {
+	Trying      bool
 	Started     bool
 	Registering bool
 	Backend     string
@@ -265,7 +266,7 @@ func (s *Server) ActionHandler(w http.ResponseWriter, r *http.Request) {
 	action := vars["action"]
 
 	go s.gracefullyShutdown()
-	s.health = false
+	s.Trying = false
 
 	if action == "restart" {
 		time.Sleep(3 * time.Second)
@@ -328,11 +329,11 @@ func (s *Server) problemHandler(problem string) {
 
 func (s *Server) TryRegister() {
 	attempt := 0
-	trying := true
+	s.Trying = true
 
-	for trying {
+	for s.Trying {
 		if attempt > core.Config.Retries {
-			trying = false
+			s.Trying = false
 			panic(fmt.Sprintf("failed to register after all attempts, stopping"))
 		}
 
@@ -343,7 +344,7 @@ func (s *Server) TryRegister() {
 			attempt++
 			time.Sleep(3 * time.Second)
 		} else {
-			trying = false
+			s.Trying = false
 		}
 	}
 
