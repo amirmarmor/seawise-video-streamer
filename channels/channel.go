@@ -79,14 +79,14 @@ func (c *Channel) EncodeImage() {
 
 	jpegOption := &jpeg.Options{Quality: jpegQuality}
 
-	image, err := c.image.ToImage()
+	img, err := c.image.ToImage()
 	if err != nil {
 		log.Warn(fmt.Sprintf("Failed to change to image: %v", err))
 		return
 	}
 
 	buf := new(bytes.Buffer)
-	err = jpeg.Encode(buf, image, jpegOption)
+	err = jpeg.Encode(buf, img, jpegOption)
 	if err != nil {
 		log.Warn(fmt.Sprintf("Failed to encode image: %v", err))
 		return

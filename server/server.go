@@ -53,12 +53,11 @@ func Produce(chs *channels.Channels) *Server {
 
 	log.V5("REGISTERING DEVICE - " + server.Backend)
 
-	server.TryRegister()
-
 	router := mux.NewRouter()
-	router.HandleFunc("/shutdown", server.ShutdownHandler)
-	router.HandleFunc("/start", server.StartHandler)
-	router.HandleFunc("/stop", server.StopHandler)
+	router.HandleFunc("/shutdown", server.ShutdownHandler).Methods("GET")
+	router.HandleFunc("/start/{port}", server.StartHandler).Methods("GET")
+	router.HandleFunc("/stop", server.StopHandler).Methods("GET")
+	router.HandleFunc("/getchannels", server.GetChannelsHandler).Methods("GET")
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
 		if err != nil {
@@ -71,13 +70,13 @@ func Produce(chs *channels.Channels) *Server {
 		Handler: router,
 	}
 
-	server.health = true
-	go server.handleProblems()
-	go server.handleHealthCheck()
+	server.TryRegister()
+
 	return server
 }
 
 func (s *Server) handleHealthCheck() {
+	s.health = true
 	for s.health {
 		select {
 		case <-s.ticker.C:
@@ -91,7 +90,8 @@ func (s *Server) handleHealthCheck() {
 }
 
 func (s *Server) checkHealth() error {
-	resp, err := http.Get(s.Backend + "/health")
+	url := s.Backend + "/health/" + s.DeviceInfo.Sn
+	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed health check: %v", err)
 	}
@@ -109,7 +109,7 @@ func (s *Server) checkHealth() error {
 	return nil
 }
 
-func (s *Server) Register(channels int) error {
+func (s *Server) Register() error {
 	url := s.Backend + "/register"
 	err := s.getPlatform()
 	if err != nil {
@@ -127,10 +127,9 @@ func (s *Server) Register(channels int) error {
 	}
 
 	s.DeviceInfo = &DeviceInfo{
-		Sn:       sn,
-		Ip:       ip,
-		Owner:    "echo",
-		Channels: channels,
+		Sn:    sn,
+		Ip:    ip,
+		Owner: "echo",
 	}
 
 	postBody, err := json.Marshal(s.DeviceInfo)
@@ -220,25 +219,43 @@ func (s *Server) getIp() (string, error) {
 }
 
 func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	portString := vars["port"]
+
+	port, err := strconv.Atoi(portString)
+	if err != nil {
+		log.Warn(fmt.Sprintf("invalid port %v: %v", portString, err))
+		sendErrorMessage(w)
+		return
+	}
+
+	if port < core.Config.BackendPort+10 {
+		log.Warn(fmt.Sprintf("invalid port %v: %v", port, err))
+		sendErrorMessage(w)
+		return
+	}
+
 	response := "Already started"
 	if s.Started {
-		_, err := w.Write([]byte(response))
+		_, err = w.Write([]byte(response))
 		if err != nil {
 			panic(err)
 		}
 		return
 	}
 
-	response = "starting..."
+	response = "ok"
 	s.Started = true
 
-	//for _, streamer := range s.Streamers {
-	//streamer.Connect()
-	//}
+	for _, channel := range s.Channels.Array {
+		streamer := CreateStreamer(channel.Queue, &s.Problems)
+		streamer.Connect(port)
+		s.Streamers = append(s.Streamers, CreateStreamer(streamer.Queue, &s.Problems))
+	}
 
 	go s.Channels.Start()
 
-	_, err := w.Write([]byte(response))
+	_, err = w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}
@@ -288,8 +305,20 @@ func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+func (s *Server) GetChannelsHandler(w http.ResponseWriter, r *http.Request) {
+	err := s.Channels.DetectCameras()
+	if err != nil {
+		panic("failed to create channels!!!!!")
+	}
+
+	_, err = w.Write([]byte(strconv.Itoa(len(s.Channels.Array))))
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (s *Server) handleProblems() {
-	for {
+	for s.health {
 		select {
 		case problem := <-s.Problems:
 			go s.problemHandler(problem)
@@ -299,31 +328,19 @@ func (s *Server) handleProblems() {
 
 func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
-	s.gracefullyShutdown()
-	//s.TryRegister()
 }
 
 func (s *Server) TryRegister() {
-	if len(s.Streamers) > 0 {
-		log.V5("already registered")
-		return
-	}
-
 	attempt := 0
 	trying := true
+
 	for trying {
-
-		err := s.Channels.DetectCameras()
-		if err != nil {
-			panic("failed to create channels!!!!!")
-		}
-
 		if attempt > core.Config.Retries {
 			trying = false
 			panic(fmt.Sprintf("failed to register after all attempts, stopping"))
 		}
 
-		err = s.Register(len(s.Channels.Array))
+		err := s.Register()
 		if err != nil {
 			log.Warn(fmt.Sprintf("failed to register: %v", err))
 			log.Warn(fmt.Sprintf("Retrying to register - attempt %v", strconv.Itoa(attempt)))
@@ -334,11 +351,8 @@ func (s *Server) TryRegister() {
 		}
 	}
 
-	for i, channel := range s.Channels.Array {
-		streamer := CreateStreamer(channel.Queue, &s.Problems)
-		streamer.Connect(s.DeviceInfo.Port + i)
-		s.Streamers = append(s.Streamers, streamer)
-	}
+	go s.handleHealthCheck()
+	go s.handleProblems()
 
 	return
 }
@@ -359,6 +373,15 @@ func (s *Server) gracefullyShutdown() {
 		}
 		s.Streamers = s.Streamers[:0]
 	}
-	time.Sleep(1 * time.Second)
+
+	s.health = false
 	log.V5("shut down complete")
+}
+
+func sendErrorMessage(w http.ResponseWriter) {
+	w.WriteHeader(500)
+	_, err := w.Write([]byte("an error occured"))
+	if err != nil {
+		log.Warn("failed to write response")
+	}
 }

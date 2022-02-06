@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"www.seawise.com/client/core"
 	"www.seawise.com/client/log"
 )
@@ -16,7 +15,6 @@ type Channels struct {
 	Array       []*Channel
 	attempts    int
 	Started     bool
-	timer       *time.Ticker
 	StopChannel chan string
 }
 
@@ -69,7 +67,7 @@ func (c *Channels) DetectCameras() error {
 		log.V5(fmt.Sprintf("Attempting to start channel - %v / %v", i, c.attempts))
 		for _, num := range vids {
 			channel := CreateChannel(num)
-			err := channel.Init()
+			err = channel.Init()
 			if err != nil {
 				continue
 			} else {
@@ -90,13 +88,10 @@ func (c *Channels) DetectCameras() error {
 func (c *Channels) Start() {
 	if !c.Started {
 		c.Started = true
-		c.timer = time.NewTicker(50 * time.Millisecond)
-
 		for c.Started {
 			select {
 			case code := <-c.StopChannel:
 				c.Stop(code)
-				//case <-c.timer.C:
 			default:
 				c.Stream()
 			}

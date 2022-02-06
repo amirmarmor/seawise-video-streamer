@@ -87,8 +87,10 @@ func (s *Streamer) pack(frame []byte) []byte {
 }
 
 func (s *Streamer) Stop() {
-	err := s.TCPConn.Close()
-	if err != nil {
-		log.Warn(fmt.Sprintf("Failed to close socket: %v", err))
+	if s.TCPConn != nil {
+		err := s.TCPConn.Close()
+		if err != nil {
+			log.Warn(fmt.Sprintf("Failed to close socket: %v", err))
+		}
 	}
 }
