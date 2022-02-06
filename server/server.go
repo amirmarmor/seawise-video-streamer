@@ -54,9 +54,8 @@ func Produce(chs *channels.Channels) *Server {
 	log.V5("REGISTERING DEVICE - " + server.Backend)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/shutdown", server.ShutdownHandler).Methods("GET")
 	router.HandleFunc("/start/{port}", server.StartHandler).Methods("GET")
-	router.HandleFunc("/stop", server.StopHandler).Methods("GET")
+	router.HandleFunc("/action/{action}", server.ActionHandler).Methods("GET")
 	router.HandleFunc("/getchannels", server.GetChannelsHandler).Methods("GET")
 	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err := writer.Write([]byte("ok"))
@@ -261,48 +260,38 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) StopHandler(w http.ResponseWriter, r *http.Request) {
-	s.Channels.StopChannel <- "stop"
-	time.Sleep(3 * time.Second)
-	s.Started = false
-	response := "stopping..."
+func (s *Server) ActionHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	action := vars["action"]
+
+	go s.gracefullyShutdown()
+
+	if action == "restart" {
+		go s.TryRegister()
+	}
+
+	if action == "shutdown" {
+		go func() {
+			time.Sleep(1 * time.Second)
+			err := s.Server.Shutdown(context.Background())
+			if err != nil {
+				log.Fatal(fmt.Sprintf("Failed to shutdown server - %v", err))
+			}
+		}()
+	}
+
+	if action == "reboot" {
+		go func() {
+			time.Sleep(2 * time.Second)
+			exec.Command("sudo", "reboot")
+		}()
+	}
+
+	response := fmt.Sprintf("Did %v", action)
 	_, err := w.Write([]byte(response))
 	if err != nil {
 		panic(err)
 	}
-}
-
-func (s *Server) ShutdownHandler(w http.ResponseWriter, r *http.Request) {
-	response := "Shutting down..."
-
-	s.gracefullyShutdown()
-	log.V5("HERERERRRR")
-	//err = s.Channels.DetectCameras()
-	//if err != nil {
-	//	log.Warn(fmt.Sprintf("failed to re-detect cameras - %v", err))
-	//	sendErrorMessage(w)
-	//	return
-	//}
-
-	//err = s.Register(len(s.Channels.Array))
-	//if err != nil {
-	//	log.Warn(fmt.Sprintf("failed to re-register - %v", err))
-	//	sendErrorMessage(w)
-	//	return
-	//}
-
-	_, err := w.Write([]byte(response))
-	if err != nil {
-		panic(err)
-	}
-
-	time.Sleep(1 * time.Second)
-	go func() {
-		err = s.Server.Shutdown(context.Background())
-		if err != nil {
-			log.Fatal(fmt.Sprintf("Failed to shutdown server - %v", err))
-		}
-	}()
 }
 
 func (s *Server) GetChannelsHandler(w http.ResponseWriter, r *http.Request) {
@@ -328,11 +317,7 @@ func (s *Server) handleProblems() {
 
 func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
-} //for i, channel := range s.Channels.Array {
-//	streamer := CreateStreamer(channel.Queue, &s.Problems)
-//	streamer.Connect(s.DeviceInfo.Port + i)
-//	s.Streamers = append(s.Streamers, streamer)
-//}
+}
 
 func (s *Server) TryRegister() {
 	attempt := 0
