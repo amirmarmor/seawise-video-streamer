@@ -104,6 +104,6 @@ func (c *Channel) close() error {
 	if err != nil {
 		return fmt.Errorf("failed to close image: %v", err)
 	}
-
+	close(*c.Queue)
 	return nil
 }
