@@ -328,7 +328,11 @@ func (s *Server) handleProblems() {
 
 func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
-}
+} //for i, channel := range s.Channels.Array {
+//	streamer := CreateStreamer(channel.Queue, &s.Problems)
+//	streamer.Connect(s.DeviceInfo.Port + i)
+//	s.Streamers = append(s.Streamers, streamer)
+//}
 
 func (s *Server) TryRegister() {
 	attempt := 0
