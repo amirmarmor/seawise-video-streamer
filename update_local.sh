@@ -1,3 +1,4 @@
+cd /home/pi/seawise-video-streamer
 git reset HEAD --hard
 git pull
 
