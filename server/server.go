@@ -70,7 +70,7 @@ func Produce(chs *channels.Channels) *Server {
 		Handler: router,
 	}
 
-	server.TryRegister()
+	server.TryRegister("produce")
 
 	return server
 }
@@ -83,7 +83,7 @@ func (s *Server) handleHealthCheck() {
 			err := s.checkHealth()
 			if err != nil {
 				s.gracefullyShutdown()
-				s.TryRegister()
+				s.TryRegister("health")
 			}
 		}
 	}
@@ -265,12 +265,13 @@ func (s *Server) ActionHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	action := vars["action"]
 
+	log.V5(fmt.Sprintf("Doing action %v", action))
 	go s.gracefullyShutdown()
 	s.Trying = false
 
 	if action == "restart" {
 		time.Sleep(3 * time.Second)
-		go s.TryRegister()
+		go s.TryRegister("restart")
 	}
 
 	if action == "shutdown" {
@@ -327,7 +328,8 @@ func (s *Server) problemHandler(problem string) {
 	log.V5("Problem - %v", problem)
 }
 
-func (s *Server) TryRegister() {
+func (s *Server) TryRegister(from string) {
+	log.V5(fmt.Sprintf("Try called from %v", from))
 	attempt := 0
 	s.Trying = true
 
