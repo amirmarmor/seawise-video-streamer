@@ -247,9 +247,9 @@ func (s *Server) StartHandler(w http.ResponseWriter, r *http.Request) {
 	response = "ok"
 	s.Started = true
 
-	for _, channel := range s.Channels.Array {
+	for i, channel := range s.Channels.Array {
 		streamer := CreateStreamer(channel.Queue, &s.Problems)
-		streamer.Connect(port)
+		streamer.Connect(port + i)
 		s.Streamers = append(s.Streamers, CreateStreamer(streamer.Queue, &s.Problems))
 	}
 
