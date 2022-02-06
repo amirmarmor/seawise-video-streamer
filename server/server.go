@@ -39,7 +39,7 @@ type Server struct {
 	Platform    string
 	Problems    chan string
 	ticker      *time.Ticker
-	health      bool
+	Health      bool
 }
 
 func Produce(chs *channels.Channels) *Server {
@@ -76,8 +76,8 @@ func Produce(chs *channels.Channels) *Server {
 }
 
 func (s *Server) handleHealthCheck() {
-	s.health = true
-	for s.health {
+	s.Health = true
+	for s.Health {
 		select {
 		case <-s.ticker.C:
 			err := s.checkHealth()
@@ -85,6 +85,7 @@ func (s *Server) handleHealthCheck() {
 				s.gracefullyShutdown()
 				s.TryRegister("health")
 			}
+		default:
 		}
 	}
 }
@@ -373,7 +374,7 @@ func (s *Server) gracefullyShutdown() {
 		s.Streamers = s.Streamers[:0]
 	}
 
-	s.health = false
+	s.Health = false
 	log.V5("shut down complete")
 }
 
