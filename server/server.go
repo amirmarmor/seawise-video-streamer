@@ -283,8 +283,15 @@ func (s *Server) ActionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if action == "reboot" {
-		log.V5("Rebooting....")
-		exec.Command("sudo reboot")
+		go func() {
+			log.V5("Rebooting....")
+			time.Sleep(2 * time.Second)
+			cmd := exec.Command("sudo", "reboot")
+			_, err := cmd.Output()
+			if err != nil {
+				panic(fmt.Sprintf("failed to reboot: %v", err))
+			}
+		}()
 	}
 
 	response := fmt.Sprintf("Did %v", action)
