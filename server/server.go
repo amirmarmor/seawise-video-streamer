@@ -265,6 +265,7 @@ func (s *Server) ActionHandler(w http.ResponseWriter, r *http.Request) {
 	action := vars["action"]
 
 	go s.gracefullyShutdown()
+	s.health = false
 
 	if action == "restart" {
 		time.Sleep(3 * time.Second)
