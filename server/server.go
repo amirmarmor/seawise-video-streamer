@@ -317,7 +317,7 @@ func (s *Server) GetChannelsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProblems() {
-	for s.health {
+	for s.Health {
 		select {
 		case problem := <-s.Problems:
 			go s.problemHandler(problem)
