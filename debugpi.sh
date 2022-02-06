@@ -10,6 +10,5 @@ echo "connecting to " + $BEHOST
 cmd=/home/pi/seawise-video-streamer/start
 $cmd
 
-
 now=$(date +"%T")
 echo "[$now] Running"
